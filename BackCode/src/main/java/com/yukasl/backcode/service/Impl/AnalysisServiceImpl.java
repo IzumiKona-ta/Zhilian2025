@@ -1,0 +1,97 @@
+package com.yukasl.backcode.service.Impl;
+
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.autoconfigure.PageHelperProperties;
+import com.yukasl.backcode.mapper.AnalysisMapper;
+import com.yukasl.backcode.pojo.DTO.alertPageDTO;
+import com.yukasl.backcode.pojo.DTO.pageTrafficDateDTO;
+import com.yukasl.backcode.pojo.entity.potentialThreatAlert;
+import com.yukasl.backcode.pojo.entity.threatTrafficStat;
+import com.yukasl.backcode.result.PageResult;
+import com.yukasl.backcode.service.AnalysisService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+public class AnalysisServiceImpl implements AnalysisService {
+    @Autowired
+    private AnalysisMapper analysisMapper;
+    @Autowired
+    private PageHelperProperties Page;
+    @Autowired
+    private RestTemplate restTemplate;
+
+    /**
+     * 查询威胁流量统计数据
+     *
+     * @param pageTrafficDateDTO
+     * @return
+     */
+    @Override
+    public PageResult pageTrafficDate(pageTrafficDateDTO pageTrafficDateDTO) {
+        if (pageTrafficDateDTO == null) {
+            throw new RuntimeException("查询威胁流量统计数据所需请求参数为空");
+        }
+        PageHelper.startPage(pageTrafficDateDTO.getPageNum(), pageTrafficDateDTO.getPageSize());
+        List<threatTrafficStat> list = analysisMapper.page(pageTrafficDateDTO);
+        Page<threatTrafficStat> p = (Page<threatTrafficStat>) list;
+        return new PageResult(p.getTotal(), p.getResult());
+    }
+
+    /**
+     * 查询潜在威胁预警列表
+     *
+     * @param alertPageDTO
+     * @return
+     */
+    @Override
+    public PageResult queryAlert(alertPageDTO alertPageDTO) {
+        PageHelper.startPage(alertPageDTO.getPageNum(), alertPageDTO.getPageSize());
+        List<potentialThreatAlert> list = analysisMapper.queryAlertPage(alertPageDTO);
+        Page<potentialThreatAlert> p = (Page<potentialThreatAlert>) list;
+        return new PageResult(p.getTotal(), p.getResult());
+    }
+
+    /**
+     * 查看潜在威胁预警详情
+     */
+    @Override
+    public potentialThreatAlert queryAlertById(Integer id) {
+        if (id == null) {
+            throw new RuntimeException("查看潜在威胁预警详情请求参数Id为空");
+        }
+        potentialThreatAlert threatAlert = analysisMapper.queryAlertById(id);
+        return threatAlert;
+    }
+
+    /**
+     * 保存并上链告警
+     */
+    @Override
+    public void saveAlert(potentialThreatAlert alert) {
+        if (alert.getCreateTime() == null) {
+            alert.setCreateTime(LocalDateTime.now());
+        }
+        if (alert.getOccurTime() == null) {
+            alert.setOccurTime(LocalDateTime.now());
+        }
+        // 1. 保存到本地数据库 (供前端快速查询)
+        analysisMapper.insert(alert);
+
+        // 2. 推送到区块链网关 (存证)
+        try {
+            // 注意：这里调用的是 backend (8080) 的上链接口
+            String url = "http://localhost:8080/api/chain/alert";
+            // 异步发送，避免阻塞
+            restTemplate.postForObject(url, alert, String.class);
+        } catch (Exception e) {
+            // 上链失败不应影响本地存储，记录日志即可
+            e.printStackTrace();
+        }
+    }
+}

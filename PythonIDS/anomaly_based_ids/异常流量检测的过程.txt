@@ -1,0 +1,7 @@
+1.运行 collect_normal_traffic.py 收集正常流量；
+2.运行 collect_anomaly_traffic.py 收集异常流量；
+3.运行 prepare_data.py 处理数据；
+4.运行 train_real_model.py 训练模型；
+5.运行 anomaly_detector.py 模型
+
+核心流程为「数据采集→数据预处理→模型训练→实时检测」
