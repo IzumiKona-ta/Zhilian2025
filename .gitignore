@@ -36,6 +36,14 @@ PythonIDS/**/*.npy
 PythonIDS/**/*.pkl
 PythonIDS/**/*.pth
 PythonIDS/**/*.h5
+# Exclude large training data (>50MB) to prevent Git push errors
+PythonIDS/**/X_train.npy
+PythonIDS/**/X_test.npy
+# Allow runtime-critical model files (small enough for GitHub)
+!PythonIDS/**/best_model_4x5880_max.pth
+!PythonIDS/**/pca.pkl
+!PythonIDS/**/scaler.pkl
+!PythonIDS/**/label_encoder.npy
 # Keep specific model files if they are small and necessary, otherwise ignore large binaries
 
 # ==========================================
