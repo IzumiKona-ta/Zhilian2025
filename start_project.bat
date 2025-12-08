@@ -7,7 +7,7 @@ echo.
 
 :: 1. Start Blockchain Infrastructure
 echo [1/4] Starting Blockchain Infrastructure (Backen)...
-start "Backen Infra" /D "%~dp0\backend\script" bash start_infra.sh
+start "Backen Infra" /D "%~dp0\backend\script" wsl bash start_infra.sh
 timeout /t 10
 
 echo [1/4] Starting Blockchain Middleware (Spring Boot)...

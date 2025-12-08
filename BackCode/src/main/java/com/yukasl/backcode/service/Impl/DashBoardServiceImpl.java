@@ -1,4 +1,4 @@
-package com.yukasl.backcode.service.Impl;
+package com.yukasl.backcode.service.impl;
 
 import com.yukasl.backcode.mapper.DashBoardMapper;
 import com.yukasl.backcode.pojo.VO.DashBoardVO;

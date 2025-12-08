@@ -95,6 +95,10 @@
             <version>0.11.5</version>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
         <!-- 工具类（可选，简化操作） -->
         <dependency>
             <groupId>cn.hutool</groupId>

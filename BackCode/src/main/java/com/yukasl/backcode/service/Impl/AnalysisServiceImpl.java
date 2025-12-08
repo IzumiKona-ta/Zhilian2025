@@ -1,4 +1,4 @@
-package com.yukasl.backcode.service.Impl;
+package com.yukasl.backcode.service.impl;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -86,7 +86,9 @@ public class AnalysisServiceImpl implements AnalysisService {
         // 2. 推送到区块链网关 (存证)
         try {
             // 注意：这里调用的是 backend (8080) 的上链接口
-            String url = "http://localhost:8080/api/chain/alert";
+            // 修正：Java 默认解析 localhost 可能会优先 IPv4 (127.0.0.1)，但 WSL 端口转发有时只绑定 IPv6 (::1)
+            // 根据测试，localhost (::1) 是通的，而 127.0.0.1 不通，所以这里显式使用 [::1] 确保连接成功
+            String url = "http://[::1]:8080/api/chain/alert";
             // 异步发送，避免阻塞
             restTemplate.postForObject(url, alert, String.class);
         } catch (Exception e) {

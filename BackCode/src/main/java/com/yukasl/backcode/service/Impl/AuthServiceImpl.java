@@ -1,4 +1,4 @@
-package com.yukasl.backcode.service.Impl;
+package com.yukasl.backcode.service.impl;
 
 import com.yukasl.backcode.mapper.AuthMapper;
 import com.yukasl.backcode.pojo.entity.sysUser;

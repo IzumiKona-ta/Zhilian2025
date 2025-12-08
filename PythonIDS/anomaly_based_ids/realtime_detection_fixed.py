@@ -19,7 +19,7 @@ from ids_common import (
 )
 
 # ========== 运行配置 ==========
-CAPTURE_MINUTES = 30 / 60  # 30秒（30/60分钟）
+CAPTURE_MINUTES = 300000 / 60  # 30秒（30/60分钟）
 SHOW_ALL_PACKETS = True
 SHOW_COLOR = True
 ENABLE_ANOMALY_SIMULATION = False

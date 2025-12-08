@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: 'http://localhost:8081', // Backnode runs on 8081
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '') 
+          // rewrite: (path) => path.replace(/^\/api/, '') // 后端接口本身包含 /api 前缀，无需重写
         },
         // WebSocket 代理示例
         '/ids/stream': {

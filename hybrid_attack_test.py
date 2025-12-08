@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 
 
-DEFAULT_TARGET = "192.168.109.151"
+DEFAULT_TARGET = "192.168.31.87"
 DEFAULT_DURATION = 35
 
 # 未知攻击使用的端口范围（与检测端的已知端口库错开）

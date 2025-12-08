@@ -260,17 +260,52 @@ export class IDSSocket {
       try {
         const rawData = JSON.parse(event.data);
         
-        // 数据适配层：将后端字段映射为前端 ThreatEvent 类型
-        // 如果您的 IDS 返回字段不同（如 event_id），请在此处修改
+        // 解析 impactScope: "192.168.1.121:12785 -> 10.0.0.5:80 | DDoS"
+        let sourceIp = '0.0.0.0';
+        let targetIp = '0.0.0.0';
+        let attackType = '未知攻击';
+
+        if (rawData.impactScope) {
+            try {
+                const parts = rawData.impactScope.split('|');
+                if (parts.length >= 1) {
+                    const flow = parts[0].trim(); // "192.168.1.121:12785 -> 10.0.0.5:80"
+                    if (parts.length >= 2) {
+                        attackType = parts[1].trim(); // "DDoS"
+                    }
+                    
+                    const ips = flow.split('->');
+                    if (ips.length >= 2) {
+                        sourceIp = ips[0].trim().split(':')[0];
+                        targetIp = ips[1].trim().split(':')[0];
+                    }
+                }
+            } catch (err) {
+                console.warn('[IDS] 解析 impactScope 失败:', err);
+            }
+        }
+
+        // 映射 RiskLevel
+        let riskLevel = 'Medium';
+        if (rawData.threatLevel) {
+            switch (Number(rawData.threatLevel)) {
+                case 1: riskLevel = 'Low'; break;
+                case 2: riskLevel = 'Medium'; break;
+                case 3: riskLevel = 'High'; break;
+                case 4: riskLevel = 'High'; break;
+                default: riskLevel = 'Medium';
+            }
+        }
+
         const adaptedEvent: ThreatEvent = {
-            id: rawData.id || rawData.event_id || `IDS-${Date.now()}`,
-            type: rawData.type || rawData.attack_type || '未知攻击',
-            sourceIp: rawData.sourceIp || rawData.src_ip || '0.0.0.0',
-            targetIp: rawData.targetIp || rawData.dst_ip || '0.0.0.0',
-            timestamp: rawData.timestamp || new Date().toLocaleTimeString(),
-            riskLevel: rawData.riskLevel || rawData.severity || 'Medium',
+            id: rawData.threatId || String(rawData.id) || `IDS-${Date.now()}`,
+            type: attackType,
+            sourceIp: sourceIp,
+            targetIp: targetIp,
+            timestamp: rawData.occurTime || new Date().toLocaleTimeString(),
+            riskLevel: riskLevel as any,
             status: 'Pending',
-            details: rawData.details || rawData.payload || '无详细信息'
+            details: rawData.impactScope || '无详细信息'
         };
         
         onMessage(adaptedEvent);

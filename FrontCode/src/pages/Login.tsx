@@ -13,7 +13,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('password');
+  const [password, setPassword] = useState('123456');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

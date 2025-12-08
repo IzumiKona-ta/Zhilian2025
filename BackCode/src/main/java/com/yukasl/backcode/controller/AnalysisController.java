@@ -6,6 +6,8 @@ import com.yukasl.backcode.pojo.entity.potentialThreatAlert;
 import com.yukasl.backcode.result.PageResult;
 import com.yukasl.backcode.result.Result;
 import com.yukasl.backcode.service.AnalysisService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yukasl.backcode.websocket.WebSocketServer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class AnalysisController {
     @Autowired
     private AnalysisService analysisService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * 查询威胁流量统计数据
@@ -67,6 +72,15 @@ public class AnalysisController {
     public Result<String> receiveAlert(@RequestBody potentialThreatAlert alert) {
         log.info("接收到 IDS 实时告警: {}", alert);
         analysisService.saveAlert(alert);
+
+        // 推送 WebSocket 消息
+        try {
+            String json = objectMapper.writeValueAsString(alert);
+            WebSocketServer.sendInfo(json);
+        } catch (Exception e) {
+            log.error("WebSocket 推送失败", e);
+        }
+
         return Result.success("Alert received and processed");
     }
 }
