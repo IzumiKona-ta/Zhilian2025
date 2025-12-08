@@ -1,101 +1,97 @@
 # Zhilian2025 项目深度分析与变更报告
 
-> **版本**: v4.0 (最终联调版)
+> **版本**: v5.0 (完全交付版 - All Systems Go)
 > **日期**: 2025-12-08
-> **状态**: 已准备好部署
+> **状态**: 🟢 已完成联调 | 🟢 真实攻击验证通过 | 🟢 区块链上链成功
 
 ---
 
-## 1. 系统架构与端口配置
+## 1. 系统全景图 (System Overview)
 
-### 1.1 服务拓扑图
-| 模块 (Module) | 角色 (Role) | 技术栈 (Stack) | 端口 (Port) | 访问地址 |
-| :--- | :--- | :--- | :--- | :--- |
-| **BackCode** | **业务核心后端** | Java (Spring Boot) | **8081** | `http://localhost:8081` |
-| **Backen** | **区块链中间件** | Java (Fabric SDK) | **8080** | `http://localhost:8080` |
-| **FrontCode**| **前端可视化大屏** | React (Vite) | **3000** | `http://localhost:3000` |
-| **PythonIDS**| **ML 机器学习检测** | Python (PyTorch) | N/A | 发送数据至 `localhost:8081` |
-| **RuleBasedIDS**| **规则检测 (Snort)** | Python (Scapy) | N/A | 发送数据至 `localhost:8081` |
+本项目已完成从底层流量捕获到顶层可视化的全链路打通。系统由五个核心模块组成，通过 REST API、WebSocket 和 gRPC (Fabric) 紧密协作。
 
-*(注：为避免与区块链中间件的默认端口冲突，业务后端 BackCode 已迁移至 8081 端口，前端代理配置已同步更新。)*
-
----
-
-## 2. 模块详细信息与变更日志
-
-### 2.1 BackCode (业务后端)
-#### 📘 基础信息
-*   **功能**: 系统的中央枢纽。负责用户认证、接收 IDS 告警、数据持久化到 MySQL，并协调区块链中间件进行数据存证。
-*   **关键路径**: `c:\Users\35742\Desktop\Zhilian2025\BackCode`
-*   **核心控制器**: `AnalysisController.java` (负责接收告警)
-
-#### 📝 新增与修改
-*   **[修改] 端口重分配**: 在 `application.yml` 中将 `server.port` 从默认的 `8080` 改为 **`8081`**，以解决与 Backen 的端口冲突。
-*   **[新增] 双写逻辑**: 修改了 `AnalysisServiceImpl.java`，实现了告警数据的“双路存储”——既写入 MySQL 数据库 (`potential_threat_alert` 表)，又通过异步调用 Backen 接口上链。
-*   **[新增] API 接口**: 恢复了 `AnalysisController.java` 中的 `POST /api/analysis/alert` 接口，用于接收来自 IDS 的 JSON 数据。
-*   **[修复] Git 清理**: 移除了嵌套的 `.git` 目录，确保根目录版本控制正常。
+### 1.1 服务拓扑与端口映射
+| 模块 | 角色 | 端口 | 技术栈 | 部署状态 | 关键配置路径 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **FrontCode** | 态势感知大屏 | **3000** | React + Vite + TS | 🟢 运行中 | `vite.config.ts` (Proxy -> 8081) |
+| **BackCode** | 业务控制中枢 | **8081** | Spring Boot 3.x | 🟢 运行中 | `application.yml` (Port: 8081) |
+| **Backen** | 区块链网关 | **8080** | Java + Fabric SDK | 🟢 运行中 | `backend/src/.../EvidenceContract.java` |
+| **IDS (Rule)** | 规则检测引擎 | N/A | Python + Scapy | 🟢 运行中 | `RuleBasedIDS/mini_snort_pro.py` |
+| **IDS (ML)** | AI 检测引擎 | N/A | PyTorch | 🟢 运行中 | `PythonIDS/.../realtime_detection_fixed.py` |
 
 ---
 
-### 2.2 Backen (区块链中间件)
-#### 📘 基础信息
-*   **功能**: 作为 Hyperledger Fabric 网络的网关。它封装了底层的链码调用细节，向业务后端暴露简单的 REST API。
-*   **关键路径**: `c:\Users\35742\Desktop\Zhilian2025\backend` (文件夹名为 `backend`，逻辑名为 `Backen`)
-*   **核心合约**: `EvidenceContract.java`
+## 2. 核心模块详细变更日志 (Technical Changelog)
 
-#### 📝 新增与修改
-*   **[信息] 端口确认**: 确认运行在 **`8080`** 端口。
-*   **[新增] 链码逻辑**: 在 `EvidenceContract.java` 中实现了 `queryEvidenceByType` 富查询功能。
-*   **[修复] 启动脚本**: 修正了 `start_project.bat`，在启动命令前添加了 `wsl` 前缀，以适配 WSL 环境下的证书路径。
+### 2.1 FrontCode (前端大屏)
+> **核心修复**: 解决了“黑屏崩溃”、“历史数据为空”和“404 接口不通”三大阻断性问题。
 
----
+*   **[网络层] 代理配置修正 (`vite.config.ts`)**:
+    *   目标端口从 `8080` 修正为 **`8081`** (指向业务后端)。
+    *   **移除 Rewrite**: 注释掉了 `rewrite: (path) => path.replace(/^\/api/, '')`，保留 `/api` 前缀，与后端 `@RequestMapping("/api/...")` 完美匹配。
+*   **[数据层] 历史数据适配 (`connector.ts`)**:
+    *   **分页字段兼容**: 修复了 `getHistory` 方法，从 `response.data.data.records` 读取数据，解决了 PageHelper 分页结构导致的历史记录为空问题。
+    *   **类型安全**: 强制将 `id` 字段转换为 `String` 类型，防止 React 在渲染数字 ID 时调用字符串方法导致页面崩溃 (黑屏)。
+    *   **Payload 解析**: 增加了对 `impactScope` 字段的智能解析逻辑，自动提取 `源IP`、`目标IP` 和 `攻击类型`。
+*   **[交互层] 登录体验**:
+    *   `Login.tsx`: 将默认填充密码修正为 **`123456`**，与数据库一致。
 
-### 2.3 FrontCode (前端大屏)
-#### 📘 基础信息
-*   **功能**: 实时的态势感知大屏。可视化展示威胁数据，提供统计报表，并允许管理员进行交互。
-*   **关键路径**: `c:\Users\35742\Desktop\Zhilian2025\FrontCode`
-*   **技术栈**: React 18, TypeScript, Tailwind CSS.
+### 2.2 BackCode (业务后端)
+> **核心修复**: 解决了“Bean 注入失败”、“区块链连接拒绝”和“JSON 序列化异常”。
 
-#### 📝 新增与修改
-*   **[修改] 代理配置**: 更新了 `vite.config.ts`，将 `/api` 请求代理到 **`http://localhost:8081`** (BackCode)，与新端口分配保持一致。
-*   **[修改] 真实 API 集成**: 修改了 `connector.ts`，移除了 Mock 模拟数据，改为真实调用 `/api/analysis/alert` 接口。
-*   **[新增] Payload 解析**: 在 `connector.ts` 中添加了针对 `impactScope` 字段的特殊解析逻辑 (格式: `源IP->目的IP | 攻击类型`)，确保 UI 能正确提取并显示 IP 和攻击类型。
+*   **[架构] 包名规范化 (Critical)**:
+    *   批量重命名了 `service/Impl` 目录为 `service/impl`。
+    *   修改了所有 `ServiceImpl` 类的 `package` 声明，解决了 Maven 构建时因大小写敏感导致的 `Consider defining a bean...` 启动失败问题。
+*   **[通信] 区块链连接适配 (`AnalysisServiceImpl.java`)**:
+    *   将上链目标地址从 `http://localhost:8080` 修改为 **`http://[::1]:8080`**。
+    *   **原因**: WSL 环境下端口转发有时仅绑定 IPv6 Loopback，使用 IPv4 `127.0.0.1` 会导致 `Connection Refused`。
+*   **[序列化] JSON 格式修正 (`potentialThreatAlert.java`)**:
+    *   为 `occurTime` 和 `createTime` 添加了 `@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")` 注解。
+    *   **原因**: 解决了发送给 Backen (8080) 时，时间字段被默认序列化为数组 `[2025, 12, 8...]` 导致接收端反序列化报错的问题。
+*   **[WebSocket] 依赖升级**:
+    *   修复了 `WebSocketServer.java` 中使用旧版 `javax.websocket` 的问题，全面迁移至 Spring Boot 3 要求的 **`jakarta.websocket`** 包。
 
----
+### 2.3 Backen (区块链中间件)
+> **状态**: 稳定运行，作为存证黑盒。
 
-### 2.4 PythonIDS (机器学习检测引擎)
-#### 📘 基础信息
-*   **功能**: 基于深度学习模型 (CICIDS2017 数据集) 的异常检测系统。通过分析流量统计特征来发现未知攻击。
-*   **关键路径**: `c:\Users\35742\Desktop\Zhilian2025\PythonIDS`
+*   **[接口]**: 提供 `/api/chain/alert` 接口，接收来自 BackCode 的清洗后数据。
+*   **[兼容]**: 配合 BackCode 的 DTO 修正，现在能正确解析并上链时间戳字段。
 
-#### 📝 新增与修改
-*   **[修改] 目标 URL**: 更新 `realtime_detection_fixed.py`，将告警发送地址指向 **`http://localhost:8081/api/analysis/alert`**。
-*   **[修改] Payload 适配**: 修改了告警生成逻辑，将 `session` 和 `attack_type` 拼接到 `impactScope` 字段中，以兼容当前 Backnode 的数据库结构。
-*   **[修复] Git LFS 策略**: 配置 `.gitignore`，允许提交运行时必需的小型模型文件 (`.pth`)，但排除了大型训练数据集 (`.npy`)，解决了 Git 推送失败的问题。
+### 2.4 IDS 引擎 (入侵检测)
+> **状态**: 真实流量检测就绪。
 
----
-
-### 2.5 RuleBasedIDS (规则检测引擎)
-#### 📘 基础信息
-*   **功能**: 轻量级的签名式 IDS (类似 Snort)。通过匹配预定义的规则 (JSON 格式) 来检测已知威胁。
-*   **关键路径**: `c:\Users\35742\Desktop\Zhilian2025\RuleBasedIDS` (原名为 `untitled`)
-
-#### 📝 新增与修改
-*   **[新增] 模块集成**: 识别并重命名了 `untitled` 目录为 `RuleBasedIDS`。
-*   **[新增] Backnode 集成**: 在 `mini_snort_pro.py` 中添加了 HTTP 客户端逻辑 (`requests`)。
-*   **[新增] 数据标准化**: 实现了数据格式化逻辑 (UUID 生成、时间戳格式化、`impactScope` 拼接)，使其输出与 `PythonIDS` 保持一致。
-*   **[配置] 目标 URL**: 配置发送告警至 **`http://localhost:8081/api/analysis/alert`**。
+*   **[环境] 依赖补全**:
+    *   安装了 `numpy`, `scapy`, `torch`, `requests`, `pandas`, `scikit-learn`，确保两个 IDS 脚本均可直接运行。
+*   **[规则] 规则集优化 (`rules.json`)**:
+    *   将目标端口从固定 `80` 修改为 `any`，扩大了检测范围。
+*   **[工具] 真实攻击生成器 (`trigger_real_attack.py`)**:
+    *   新增脚本，用于发送真实的 HTTP 恶意 Payload (SQLi, XSS, Path Traversal)。
+    *   **作用**: 替代了单纯的 API 模拟，实现了“真实流量 -> 抓包检测 -> 告警”的完整闭环。
 
 ---
 
-## 3. 快速启动指南
+## 3. 全链路验证通过 (Verification Passed)
 
-根目录下已创建 **一键启动脚本** (`start_project.bat`)。
+我们已成功验证了以下完整流程：
 
-1.  **运行脚本**: 双击 `start_project.bat`。
-2.  **验证服务**:
-    *   **Backen**: 检查 "Backen Infra" 和 "Backen App" 窗口 (端口 8080)。
-    *   **BackCode**: 检查 "Backnode App" 窗口 (端口 8081)。
-    *   **FrontCode**: 检查 "Frontend App" 窗口 (端口 3000) 或浏览器。
-3.  **启动检测**:
-    *   根据脚本提示，在单独的终端中手动运行 Python 脚本以观察实时日志。
+1.  **攻击发起**: 运行 `trigger_real_attack.py` 发送 `UNION SELECT` 请求。
+2.  **流量捕获**: `mini_snort_pro.py` 在本地网卡抓取到 HTTP 包，匹配 `sid:100001` 规则。
+3.  **告警上报**: IDS 自动 POST 数据到 `http://localhost:8081/api/analysis/alert`。
+4.  **业务处理**:
+    *   BackCode 将告警存入 MySQL `sys_user` 库。
+    *   BackCode 通过 WebSocket 广播消息。
+    *   BackCode 异步调用 `[::1]:8080` 将哈希存入区块链。
+5.  **前端响应**:
+    *   浏览器实时弹出红色告警卡片（包含正确的 IP 和攻击类型）。
+    *   刷新页面后，历史记录能够从数据库正确加载并显示。
+
+---
+
+## 4. 下一步建议 (Next Steps)
+
+*   **生产部署**: 目前运行在 Dev 模式，生产环境建议使用 Nginx 反向代理统一端口。
+*   **HTTPS**: 建议为 FrontCode 和 BackCode 启用 HTTPS，以保证 Token 传输安全。
+*   **模型训练**: PythonIDS 目前使用预训练权重，后续可收集现网流量进行增量训练 (`train_model.py`)。
+
+---
+**项目已交付，所有关键路径均已打通。**

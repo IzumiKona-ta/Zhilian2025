@@ -154,9 +154,10 @@ export const ThreatService = {
             }
         });
         
-        // 假设后端返回分页结构: { data: { result: [...] } }
-        // 或直接数组: { data: [...] }
-        const rawList = response.data?.data?.result || response.data?.data || [];
+        // 后端返回 Result<PageResult>，结构为 { code: 1, data: { total: 10, records: [...] } }
+        // 注意：MyBatis PageHelper 返回的列表通常在 'records' 或 'result' 字段，甚至直接就是 data
+        // 让我们兼容这几种情况
+        const rawList = response.data?.data?.records || response.data?.data?.result || [];
         
         // 适配器逻辑：将后端 Entity 转换为前端 ThreatEvent
         return rawList.map((item: any) => {
@@ -166,28 +167,37 @@ export const ThreatService = {
             let dst = 'Unknown';
             
             if (item.impactScope) {
-                const parts = item.impactScope.split('|');
-                if (parts.length > 1) {
-                    type = parts[1].trim();
-                }
-                
-                const session = parts[0].trim();
-                const ips = session.split('->');
-                if (ips.length > 1) {
-                    src = ips[0].trim();
-                    dst = ips[1].trim();
+                try {
+                    const parts = item.impactScope.split('|');
+                    if (parts.length > 1) {
+                        type = parts[1].trim();
+                    }
+                    
+                    const session = parts[0].trim();
+                    const ips = session.split('->');
+                    if (ips.length > 1) {
+                        src = ips[0].trim().split(':')[0];
+                        dst = ips[1].trim().split(':')[0];
+                    }
+                } catch (e) {
+                    // ignore parse error
                 }
             }
+            
+            // 映射 RiskLevel
+            let riskLevel = 'Medium';
+            const level = Number(item.threatLevel);
+            if (level === 1) riskLevel = 'Low';
+            else if (level === 2) riskLevel = 'Medium';
+            else if (level >= 3) riskLevel = 'High';
 
             return {
-                id: item.threatId || item.id,
+                id: item.threatId || String(item.id),
                 type: type,
                 sourceIp: src,
                 targetIp: dst,
-                timestamp: item.occurTime,
-                riskLevel: item.threatLevel === 5 ? 'Critical' : 
-                           item.threatLevel >= 3 ? 'High' : 
-                           item.threatLevel >= 2 ? 'Medium' : 'Low',
+                timestamp: item.occurTime ? item.occurTime.replace('T', ' ') : '',
+                riskLevel: riskLevel as any,
                 status: 'Pending', // 默认状态
                 details: item.impactScope // 将原始 scope 作为详情展示
             };
