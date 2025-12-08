@@ -147,47 +147,54 @@ export const ThreatService = {
   // 获取历史数据
   getHistory: async (): Promise<ThreatEvent[]> => {
     try {
-      // 适配 Backnode 分页接口 /api/analysis/alert
-      const res = await api.get(ENDPOINTS.THREAT_HISTORY, { 
-        params: { pageNum: 1, pageSize: 50 } 
-      });
-      
-      // 解析 PageResult: { code: 200, data: { total: 10, result: [...] } }
-      const list = res.data?.data?.result || []; 
-      
-      return list.map((item: any) => {
-        // 解析 impactScope: "src:port -> dst:port | Type"
-        let type = 'Unknown';
-        let src = '0.0.0.0';
-        let dst = '0.0.0.0';
-        
-        if (item.impactScope) {
-            const parts = item.impactScope.split('|');
-            if (parts.length > 1) type = parts[1].trim();
-            
-            const session = parts[0].trim();
-            const ips = session.split('->');
-            if (ips.length > 1) {
-                // 移除端口号，只保留IP
-                src = ips[0].trim().split(':')[0];
-                dst = ips[1].trim().split(':')[0];
+        const response = await api.get(ENDPOINTS.THREAT_HISTORY, {
+            params: {
+                pageNum: 1,
+                pageSize: 100 // 获取最近100条
             }
-        }
+        });
+        
+        // 假设后端返回分页结构: { data: { result: [...] } }
+        // 或直接数组: { data: [...] }
+        const rawList = response.data?.data?.result || response.data?.data || [];
+        
+        // 适配器逻辑：将后端 Entity 转换为前端 ThreatEvent
+        return rawList.map((item: any) => {
+            // 解析 impactScope 字段 (格式: "src -> dst | type")
+            let type = 'Unknown';
+            let src = 'Unknown';
+            let dst = 'Unknown';
+            
+            if (item.impactScope) {
+                const parts = item.impactScope.split('|');
+                if (parts.length > 1) {
+                    type = parts[1].trim();
+                }
+                
+                const session = parts[0].trim();
+                const ips = session.split('->');
+                if (ips.length > 1) {
+                    src = ips[0].trim();
+                    dst = ips[1].trim();
+                }
+            }
 
-        return {
-            id: item.threatId || String(item.id),
-            type: type !== 'Unknown' ? type : '疑似攻击',
-            sourceIp: src,
-            targetIp: dst,
-            timestamp: item.occurTime ? item.occurTime.replace('T', ' ') : new Date().toLocaleTimeString(),
-            riskLevel: item.threatLevel >= 4 ? 'High' : (item.threatLevel === 3 ? 'Medium' : 'Low'),
-            status: 'Pending',
-            details: item.impactScope // 保留原始 scope 作为详情
-        } as ThreatEvent;
-      });
-    } catch (e) {
-      console.warn("Fetch history failed, using mock", e);
-      throw e;
+            return {
+                id: item.threatId || item.id,
+                type: type,
+                sourceIp: src,
+                targetIp: dst,
+                timestamp: item.occurTime,
+                riskLevel: item.threatLevel === 5 ? 'Critical' : 
+                           item.threatLevel >= 3 ? 'High' : 
+                           item.threatLevel >= 2 ? 'Medium' : 'Low',
+                status: 'Pending', // 默认状态
+                details: item.impactScope // 将原始 scope 作为详情展示
+            };
+        });
+    } catch (error) {
+        console.error("Failed to fetch history:", error);
+        return [];
     }
   }
 };

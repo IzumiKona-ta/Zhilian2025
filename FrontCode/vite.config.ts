@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
         // 开发环境代理配置：解决浏览器的同源策略 (CORS) 限制
         // 当前端请求 /api/xxx 时，Vite 会将其转发到 env.VITE_API_BASE_URL
         '/api': {
-          target: env.VITE_API_BASE_URL || 'http://localhost:8080',
+          target: 'http://localhost:8081', // Backnode runs on 8081
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, '') 
         },
