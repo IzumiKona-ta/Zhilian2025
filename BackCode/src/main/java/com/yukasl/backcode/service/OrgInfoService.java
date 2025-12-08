@@ -7,9 +7,9 @@ import com.yukasl.backcode.result.PageResult;
 public interface OrgInfoService {
     PageResult queryOrgInfo(OrgInfoDTO orgInfoDTO);
 
-    void insertOrgInfo(OrgInfoDTO orgInfoDTO);
+    orgInfo insertOrgInfo(OrgInfoDTO orgInfoDTO);
 
-    void updateOrgInfo(String id, OrgInfoDTO orgInfoDTO);
+    orgInfo updateOrgInfo(String id, OrgInfoDTO orgInfoDTO);
 
     void deleteOrgInfo(String id);
 

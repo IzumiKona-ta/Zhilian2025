@@ -10,10 +10,10 @@ const ENDPOINTS = {
   AUTH_LOGIN: '/auth/login',            // 登录接口 (POST)
   
   // --- 组织/租户管理接口 ---
-  ORG_LIST: '/organizations',           // 获取组织列表 (GET)
-  ORG_CREATE: '/organizations',         // 创建新组织 (POST)
-  ORG_UPDATE: (id: string) => `/organizations/${id}`, // 更新组织信息 (PUT)
-  ORG_DELETE: (id: string) => `/organizations/${id}`, // 删除组织 (DELETE)
+  ORG_LIST: '/api/org/info',           // 获取组织列表 (GET)
+  ORG_CREATE: '/api/org/info',         // 创建新组织 (POST)
+  ORG_UPDATE: (id: string) => `/api/org/info/${id}`, // 更新组织信息 (PUT)
+  ORG_DELETE: (id: string) => `/api/org/info/${id}`, // 删除组织 (DELETE)
   
   // --- 威胁情报与处置接口 ---
   THREAT_BLOCK: (id: string) => `/threats/${id}/block`,     // 阻断攻击源 IP (POST)
@@ -109,18 +109,64 @@ export const ConfigService = {
 export const OrgService = {
   // 获取所有组织
   getAll: async (): Promise<Organization[]> => {
-    // 注意：如果您的后端返回结构是 { code: 200, data: [...] }，请改为 return res.data.data
-    return api.get(ENDPOINTS.ORG_LIST).then(res => res.data);
+    try {
+        const response = await api.get(ENDPOINTS.ORG_LIST, {
+            params: { pageNum: 1, pageSize: 100 }
+        });
+        const rawList = response.data?.data?.records || [];
+        
+        return rawList.map((item: any) => ({
+            id: String(item.id),
+            name: item.orgName,
+            memberCount: item.memberCount || 0,
+            maxMembers: item.maxMemberCount || 0,
+            adminPermission: item.adminPermission === 1,
+            createdAt: item.createTime || ''
+        }));
+    } catch (e) {
+        console.error("Failed to fetch orgs", e);
+        return [];
+    }
   },
 
   // 创建组织
   create: async (orgData: Partial<Organization>): Promise<Organization> => {
-    return api.post(ENDPOINTS.ORG_CREATE, orgData).then(res => res.data);
+    const payload = {
+        orgName: orgData.name,
+        maxMemberCount: orgData.maxMembers,
+        adminPermission: orgData.adminPermission ? 1 : 0
+    };
+    const response = await api.post(ENDPOINTS.ORG_CREATE, payload);
+    const item = response.data?.data;
+    
+    return {
+        id: String(item.id),
+        name: item.orgName,
+        memberCount: item.memberCount || 0,
+        maxMembers: item.maxMemberCount || 0,
+        adminPermission: item.adminPermission === 1,
+        createdAt: item.createTime || new Date().toISOString()
+    };
   },
 
   // 更新组织
   update: async (id: string, orgData: Partial<Organization>): Promise<Organization> => {
-    return api.put(ENDPOINTS.ORG_UPDATE(id), orgData).then(res => res.data);
+    const payload = {
+        orgName: orgData.name,
+        maxMemberCount: orgData.maxMembers,
+        adminPermission: orgData.adminPermission ? 1 : 0
+    };
+    const response = await api.put(ENDPOINTS.ORG_UPDATE(id), payload);
+    const item = response.data?.data;
+    
+    return {
+        id: String(item.id),
+        name: item.orgName,
+        memberCount: item.memberCount || 0,
+        maxMembers: item.maxMemberCount || 0,
+        adminPermission: item.adminPermission === 1,
+        createdAt: item.createTime || ''
+    };
   },
 
   // 删除组织

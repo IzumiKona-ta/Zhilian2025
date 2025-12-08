@@ -29,14 +29,16 @@ public class OrgInfoServiceImpl implements OrgInfoService {
     }
 
     @Override
-    public void insertOrgInfo(OrgInfoDTO orgInfoDTO) {
+    public orgInfo insertOrgInfo(OrgInfoDTO orgInfoDTO) {
         orgInfoDTO.setOrgId("ORG-" + RandomUtils.generateRandomString(7));
         orgInfoMapper.insertOrgInfo(orgInfoDTO);
+        return orgInfoMapper.queryLatestOrgInfo();
     }
 
     @Override
-    public void updateOrgInfo(String id, OrgInfoDTO orgInfoDTO) {
+    public orgInfo updateOrgInfo(String id, OrgInfoDTO orgInfoDTO) {
         orgInfoMapper.updateOrgInfo(id, orgInfoDTO);
+        return orgInfoMapper.getById(id);
     }
 
     @Override

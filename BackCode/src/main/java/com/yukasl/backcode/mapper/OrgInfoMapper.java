@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
 
+import org.apache.ibatis.annotations.Select;
+
 @Mapper
 public interface OrgInfoMapper {
     List<orgInfo> queryOrgInfo(OrgInfoDTO orgInfoDTO);
@@ -21,4 +23,7 @@ public interface OrgInfoMapper {
     void deleteOrgInfo(String id);
 
     orgInfo queryLatestOrgInfo();
+    
+    @Select("select * from org_info where id = #{id}")
+    orgInfo getById(String id);
 }

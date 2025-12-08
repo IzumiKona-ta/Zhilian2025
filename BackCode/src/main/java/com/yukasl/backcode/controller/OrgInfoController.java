@@ -25,24 +25,17 @@ public class OrgInfoController {
     }
 
     @PostMapping("/api/org/info")
-    public Result<Object> insertOrgInfo(@RequestBody OrgInfoDTO orgInfoDTO) {
+    public Result<orgInfo> insertOrgInfo(@RequestBody OrgInfoDTO orgInfoDTO) {
         log.info("新增组织信息，请求参数为 -> {}", orgInfoDTO);
         if (orgInfoDTO.getOrgName() == null || orgInfoDTO.getOrgName().isEmpty())
             return Result.error("orgName is empty");
-        orgInfoService.insertOrgInfo(orgInfoDTO);
-        //返回数据
-        orgInfo latestOrgInfo = orgInfoService.queryLatestOrgInfo();
-        Map<String, Object> result = new HashMap<>();
-        result.put("id", latestOrgInfo.getId());
-        result.put("orgId", latestOrgInfo.getOrgId());
-        return Result.success(result);
+        return Result.success(orgInfoService.insertOrgInfo(orgInfoDTO));
     }
 
     @PutMapping("/api/org/info/{id}")
-    public Result<Object> updateOrgInfo(@PathVariable String id, @RequestBody OrgInfoDTO orgInfoDTO) {
+    public Result<orgInfo> updateOrgInfo(@PathVariable String id, @RequestBody OrgInfoDTO orgInfoDTO) {
         log.info("修改组织权限，请求id -> {}，请求参数为 -> {}", id, orgInfoDTO);
-        orgInfoService.updateOrgInfo(id, orgInfoDTO);
-        return Result.success();
+        return Result.success(orgInfoService.updateOrgInfo(id, orgInfoDTO));
     }
 
     @DeleteMapping("/api/org/info/{id}")
