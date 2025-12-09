@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Service
 public class MonitorServiceImpl implements MonitorService {
@@ -40,5 +41,16 @@ public class MonitorServiceImpl implements MonitorService {
     @Override
     public void updateProcessMonitor(String id, ProcessMonitorDTO processMonitorDTO) {
         monitorMapper.updateProcessMonitor(id, processMonitorDTO);
+    }
+
+    @Override
+    public void saveHostStatus(hostStatusMonitor status) {
+        if (status.getCreateTime() == null) {
+            status.setCreateTime(LocalDateTime.now());
+        }
+        if (status.getMonitorTime() == null) {
+            status.setMonitorTime(LocalDateTime.now());
+        }
+        monitorMapper.insertHostStatus(status);
     }
 }

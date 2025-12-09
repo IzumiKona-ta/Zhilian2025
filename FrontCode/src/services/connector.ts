@@ -10,10 +10,10 @@ const ENDPOINTS = {
   AUTH_LOGIN: '/auth/login',            // 登录接口 (POST)
   
   // --- 组织/租户管理接口 ---
-  ORG_LIST: '/api/org/info',           // 获取组织列表 (GET)
-  ORG_CREATE: '/api/org/info',         // 创建新组织 (POST)
-  ORG_UPDATE: (id: string) => `/api/org/info/${id}`, // 更新组织信息 (PUT)
-  ORG_DELETE: (id: string) => `/api/org/info/${id}`, // 删除组织 (DELETE)
+  ORG_LIST: '/org/info',           // 获取组织列表 (GET)
+  ORG_CREATE: '/org/info',         // 创建新组织 (POST)
+  ORG_UPDATE: (id: string) => `/org/info/${id}`, // 更新组织信息 (PUT)
+  ORG_DELETE: (id: string) => `/org/info/${id}`, // 删除组织 (DELETE)
   
   // --- 威胁情报与处置接口 ---
   THREAT_BLOCK: (id: string) => `/threats/${id}/block`,     // 阻断攻击源 IP (POST)
@@ -21,7 +21,18 @@ const ENDPOINTS = {
   THREAT_HISTORY: '/analysis/alert',                        // 获取历史威胁记录 (GET)
 
   // --- 数据采集配置 ---
-  CONFIG_UPDATE: '/collection/config',  // 更新采集策略 (POST/PUT)
+  CONFIG_UPDATE: '/collection/config',  // Deprecated?
+  COLLECTION_HOST: '/collection/host',  // 主机采集配置 (GET/POST)
+  COLLECTION_HOST_DETAIL: (id: number) => `/collection/host/${id}`, // 单个主机操作 (PUT/DELETE)
+
+  // --- 仪表盘 ---
+  DASHBOARD_SUMMARY: '/dashboard/summary', // 仪表盘摘要
+  ANALYSIS_TRAFFIC: '/analysis/traffic',   // 流量统计
+
+  // --- 溯源与监控 ---
+  TRACING_LIST: '/tracing/result',           // 溯源列表
+  HOST_MONITOR: (hostId: string) => `/host/monitor/realtime/${hostId}`, // 主机实时监控
+  PROCESS_MONITOR: '/process/monitor',       // 进程监控
 };
 
 // ==========================================
@@ -97,8 +108,97 @@ export const AuthService = {
  * 用于 DataCollection.tsx
  */
 export const ConfigService = {
-  updateConfig: async (config: HostConfig): Promise<void> => {
-    return api.post(ENDPOINTS.CONFIG_UPDATE, config);
+  // 获取主机列表
+  getHostList: async (pageNum: number = 1, pageSize: number = 100) => {
+    const response = await api.get(ENDPOINTS.COLLECTION_HOST, {
+      params: { pageNum, pageSize }
+    });
+    // 适配后端 PageResult { total, records }
+    return {
+      total: response.data?.data?.total || 0,
+      list: response.data?.data?.records || []
+    };
+  },
+
+  // 新增主机
+  createHost: async (data: { hostIp: string; collectFreq: number; collectStatus: number }) => {
+    const response = await api.post(ENDPOINTS.COLLECTION_HOST, data);
+    return response.data?.data; // 返回新创建的 ID
+  },
+
+  // 更新主机
+  updateHost: async (id: number, data: Partial<HostCollectionConfig>) => {
+    await api.put(ENDPOINTS.COLLECTION_HOST_DETAIL(id), data);
+  },
+
+  // 删除主机
+  deleteHost: async (id: number) => {
+    await api.delete(ENDPOINTS.COLLECTION_HOST_DETAIL(id));
+  }
+};
+
+/**
+ * 仪表盘服务
+ * 用于 Home.tsx
+ */
+export const DashBoardService = {
+  getSummary: async () => {
+    const response = await api.get(ENDPOINTS.DASHBOARD_SUMMARY);
+    return response.data?.data;
+  }
+};
+
+/**
+ * 分析服务
+ */
+export const AnalysisService = {
+  getTraffic: async (pageNum: number = 1, pageSize: number = 20) => {
+    const response = await api.get(ENDPOINTS.ANALYSIS_TRAFFIC, {
+      params: { pageNum, pageSize }
+    });
+    return response.data?.data?.records || response.data?.data || [];
+  }
+};
+
+/**
+ * 溯源服务
+ */
+export const TracingService = {
+  getList: async (pageNum: number = 1, pageSize: number = 100) => {
+    const response = await api.get(ENDPOINTS.TRACING_LIST, {
+      params: { pageNum, pageSize }
+    });
+    // 适配 PageHelper 格式
+    return response.data?.data?.records || response.data?.data || [];
+  }
+};
+
+/**
+ * 监控服务
+ */
+export const MonitorService = {
+  // 获取主机监控列表 (用于发现活跃主机)
+  getMonitorList: async (pageNum: number = 1, pageSize: number = 100) => {
+    const response = await api.get('/host/monitor', {
+      params: { pageNum, pageSize }
+    });
+    return response.data?.data?.records || [];
+  },
+
+  getHostStatus: async (hostId: string) => {
+    const response = await api.get(ENDPOINTS.HOST_MONITOR(hostId));
+    return response.data?.data;
+  },
+  
+  getProcesses: async (pageNum: number = 1, pageSize: number = 20) => {
+    const response = await api.get(ENDPOINTS.PROCESS_MONITOR, {
+      params: { pageNum, pageSize }
+    });
+    return response.data?.data?.records || response.data?.data || [];
+  },
+
+  updateProcess: async (id: string, data: any) => {
+    await api.put(`${ENDPOINTS.PROCESS_MONITOR}/${id}`, data);
   }
 };
 

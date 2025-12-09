@@ -45,4 +45,11 @@ public class MonitorController {
         monitorService.updateProcessMonitor(id, processMonitorDTO);
         return Result.success();
     }
+
+    @PostMapping("/api/host/monitor/report")
+    public Result<String> reportHostStatus(@RequestBody hostStatusMonitor status) {
+        log.info("接收到主机上报状态: {}", status);
+        monitorService.saveHostStatus(status);
+        return Result.success("Status received");
+    }
 }

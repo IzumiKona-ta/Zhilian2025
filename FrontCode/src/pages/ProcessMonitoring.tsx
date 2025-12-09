@@ -1,43 +1,83 @@
-import React, { useState } from 'react';
-import { MOCK_PROCESSES } from '../utils/constants';
+import React, { useState, useEffect } from 'react';
 import { AlertCircle, PlayCircle, StopCircle, Search, Loader2, ShieldCheck } from 'lucide-react';
+import { MonitorService } from '../services/connector';
 
 const ProcessMonitoring: React.FC = () => {
-  const [processes, setProcesses] = useState(MOCK_PROCESSES);
+  const [processes, setProcesses] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
   
   // Track async actions on specific processes
-  const [processingId, setProcessingId] = useState<number | null>(null);
+  const [processingId, setProcessingId] = useState<number | null>(null); // Uses DB ID
   const [actionType, setActionType] = useState<'kill' | 'trust' | null>(null);
 
-  const handleKill = async (pid: number) => {
-    setProcessingId(pid);
+  const fetchProcesses = async () => {
+    try {
+      setLoading(true);
+      const data = await MonitorService.getProcesses(1, 100);
+      // Map backend data to frontend structure
+      const mapped = data.map((p: any) => ({
+        id: p.id,
+        pid: p.processId,
+        name: p.processName,
+        status: p.processStatus || 'running',
+        abnormalReason: p.abnormalReason,
+        // Mock resources as backend doesn't provide them yet
+        cpu: (p.processId % 100) / 2, 
+        memory: (p.processId % 200) + 20
+      }));
+      setProcesses(mapped);
+    } catch (error) {
+      console.error("Failed to fetch processes", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProcesses();
+    // Poll every 5 seconds
+    const interval = setInterval(fetchProcesses, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleKill = async (proc: any) => {
+    if (!proc.id) return;
+    setProcessingId(proc.id);
     setActionType('kill');
     
-    // Simulate syscall delay (sending SIGTERM/SIGKILL)
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setProcesses(prev => prev.filter(p => p.pid !== pid));
-    setProcessingId(null);
-    setActionType(null);
+    try {
+      await MonitorService.updateProcess(proc.id, { ...proc, processStatus: 'stopped' });
+      // Optimistic update or wait for poll
+      setProcesses(prev => prev.map(p => p.id === proc.id ? { ...p, status: 'stopped' } : p));
+    } catch (e) {
+      console.error("Failed to kill process", e);
+    } finally {
+      setProcessingId(null);
+      setActionType(null);
+    }
   };
 
-  const handleTrust = async (pid: number) => {
-    setProcessingId(pid);
+  const handleTrust = async (proc: any) => {
+    if (!proc.id) return;
+    setProcessingId(proc.id);
     setActionType('trust');
 
-    // Simulate database transaction to add file hash to whitelist
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    setProcesses(prev => prev.map(p => 
-        p.pid === pid ? { ...p, status: 'running', abnormalReason: undefined } : p
-    ));
-    setProcessingId(null);
-    setActionType(null);
-    alert(`PID ${pid} 的签名已加入白名单。`);
+    try {
+      await MonitorService.updateProcess(proc.id, { ...proc, processStatus: 'running', abnormalReason: '' });
+      setProcesses(prev => prev.map(p => 
+        p.id === proc.id ? { ...p, status: 'running', abnormalReason: undefined } : p
+      ));
+      alert(`PID ${proc.pid} 的签名已加入白名单。`);
+    } catch (e) {
+      console.error("Failed to trust process", e);
+    } finally {
+      setProcessingId(null);
+      setActionType(null);
+    }
   };
 
-  const filtered = processes.filter(p => p.name.includes(searchTerm) || p.pid.toString().includes(searchTerm));
+  const filtered = processes.filter(p => p.name?.includes(searchTerm) || p.pid?.toString().includes(searchTerm));
 
   // Sort: Abnormal first
   const sorted = [...filtered].sort((a, b) => (a.status === 'abnormal' ? -1 : 1));
@@ -76,10 +116,10 @@ const ProcessMonitoring: React.FC = () => {
           <tbody className="divide-y divide-cyber-700 text-slate-300">
             {sorted.map(proc => (
               <tr 
-                key={proc.pid} 
+                key={proc.id || proc.pid} 
                 className={`hover:bg-cyber-700/50 transition-colors ${
                     proc.status === 'abnormal' ? 'bg-red-500/5' : ''
-                } ${processingId === proc.pid ? 'opacity-50 pointer-events-none' : ''}`}
+                } ${processingId === proc.id ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <td className="p-4 font-mono text-sm">{proc.pid}</td>
                 <td className="p-4 font-bold text-white">{proc.name}</td>
@@ -90,7 +130,7 @@ const ProcessMonitoring: React.FC = () => {
                       proc.status === 'abnormal' ? 'bg-red-500/20 text-red-400' :
                       'bg-slate-700 text-slate-300'
                     }`}>
-                      {proc.status.toUpperCase()}
+                      {proc.status?.toUpperCase()}
                     </span>
                     {proc.status === 'abnormal' && (
                       <>
@@ -107,25 +147,32 @@ const ProcessMonitoring: React.FC = () => {
                 <td className="p-4 text-right">
                   <div className="flex justify-end gap-2">
                       <button 
-                        onClick={() => handleKill(proc.pid)}
-                        disabled={processingId === proc.pid}
+                        onClick={() => handleKill(proc)}
+                        disabled={processingId === proc.id}
                         className="p-2 text-red-400 hover:bg-red-500/20 border border-transparent hover:border-red-500/30 rounded-lg transition-all disabled:opacity-50"
                         title="终止进程 (SIGKILL)"
                       >
-                        {processingId === proc.pid && actionType === 'kill' ? <Loader2 size={18} className="animate-spin" /> : <StopCircle size={18} />}
+                        {processingId === proc.id && actionType === 'kill' ? <Loader2 size={18} className="animate-spin" /> : <StopCircle size={18} />}
                       </button>
                       <button 
-                        onClick={() => handleTrust(proc.pid)}
-                        disabled={processingId === proc.pid}
+                        onClick={() => handleTrust(proc)}
+                        disabled={processingId === proc.id}
                         className="p-2 text-cyber-accent hover:bg-cyber-accent/20 border border-transparent hover:border-cyber-accent/30 rounded-lg transition-all disabled:opacity-50" 
                         title="加入白名单"
                       >
-                         {processingId === proc.pid && actionType === 'trust' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+                         {processingId === proc.id && actionType === 'trust' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
                       </button>
                   </div>
                 </td>
               </tr>
             ))}
+            {sorted.length === 0 && !loading && (
+              <tr>
+                <td colSpan={6} className="p-8 text-center text-slate-500">
+                  暂无进程监控数据
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

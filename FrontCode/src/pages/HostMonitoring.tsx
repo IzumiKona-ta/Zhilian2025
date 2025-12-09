@@ -1,66 +1,138 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
-import { Server, Activity, Disc, Cpu, Network, Wifi, AlertOctagon } from 'lucide-react';
+import { Server, Activity, Disc, Cpu, Network, Wifi, AlertOctagon, HardDrive, FileSearch, FolderOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { MonitorService, ConfigService } from '../services/connector';
 
 const HostMonitoring: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
-  const [hostId, setHostId] = useState('host-001');
+  const [hostId, setHostId] = useState('');
+  const [hosts, setHosts] = useState<any[]>([]);
   
-  // 模拟连接状态: 'connected' | 'unstable' | 'disconnected'
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'unstable' | 'disconnected'>('connected');
-  const [latency, setLatency] = useState(24);
+  // 连接状态: 'connected' | 'unstable' | 'disconnected'
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'unstable' | 'disconnected'>('disconnected');
+  const [latency, setLatency] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  // 1. 模拟网络抖动和连接状态变化
+  // Load hosts (Configured + Active)
   useEffect(() => {
-    const statusInterval = setInterval(() => {
-       const rand = Math.random();
-       if (rand > 0.95) setConnectionStatus('disconnected');
-       else if (rand > 0.85) setConnectionStatus('unstable');
-       else setConnectionStatus('connected');
+    const fetchHosts = async () => {
+      try {
+        const allHostsMap = new Map<string, any>();
 
-       // 延迟波动
-       setLatency(prev => {
-         const target = connectionStatus === 'unstable' ? Math.floor(Math.random() * 300) + 100 : Math.floor(Math.random() * 40) + 10;
-         return Math.floor((prev + target) / 2);
-       });
-    }, 3000);
+        // 1. Get Configured Hosts
+        try {
+          const configRes = await ConfigService.getHostList(1, 100);
+          if (configRes.list) {
+            configRes.list.forEach((h: any) => {
+              // Ensure we handle potential missing fields gracefully
+              if (h.hostIp) {
+                allHostsMap.set(h.hostIp, { id: h.id, hostIp: h.hostIp, source: 'config' });
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Failed to load config hosts", e);
+        }
 
-    return () => clearInterval(statusInterval);
-  }, [connectionStatus]);
+        // 2. Get Active Hosts (reporting data)
+        try {
+          // Fetch recent monitor records to find active hosts
+          const monitorRes = await MonitorService.getMonitorList(1, 100);
+          if (monitorRes) {
+            monitorRes.forEach((h: any) => {
+               // h.hostId is the IP in the monitor data
+               if (h.hostId && !allHostsMap.has(h.hostId)) {
+                 allHostsMap.set(h.hostId, { id: `auto-${h.hostId}`, hostIp: h.hostId, source: 'active' });
+               }
+            });
+          }
+        } catch (e) {
+           console.error("Failed to load active hosts", e);
+        }
 
-  // 2. 数据流更新 (受连接状态影响)
+        const combinedHosts = Array.from(allHostsMap.values());
+        setHosts(combinedHosts);
+
+        // Default to first host if not set
+        if (!hostId && combinedHosts.length > 0) {
+           setHostId(combinedHosts[0].hostIp);
+        }
+      } catch (e) {
+        console.error("Failed to load hosts", e);
+      }
+    };
+    fetchHosts();
+  }, []);
+
+  // 用于保持数据点数量
+  const MAX_DATA_POINTS = 30;
+
+  // 数据流更新 (轮询后端)
   useEffect(() => {
-    // Initialize simulated data
-    const initData = Array.from({ length: 30 }, (_, i) => ({
-      time: i,
-      cpu: Math.floor(Math.random() * 40) + 20,
-      memory: Math.floor(Math.random() * 30) + 40,
-      net: Math.floor(Math.random() * 80) + 10,
-    }));
-    setData(initData);
+    if (!hostId) return;
 
-    const interval = setInterval(() => {
-      // 如果断开连接，则不更新数据
-      if (connectionStatus === 'disconnected') return;
+    // 清空现有数据当切换主机时
+    setData([]);
+    setLoading(true);
 
-      setData(prev => {
-        const lastTime = prev[prev.length - 1].time;
-        const newPoint = {
-          time: lastTime + 1,
-          cpu: Math.floor(Math.random() * 40) + 20 + (Math.random() > 0.8 ? 30 : 0),
-          memory: Math.floor(Math.random() * 30) + 40,
-          net: Math.floor(Math.random() * 80) + 10,
-        };
-        const newData = [...prev.slice(1), newPoint];
-        return newData;
-      });
-    }, 1500);
+    const fetchHostData = async () => {
+      const startTime = Date.now();
+      try {
+        const serverData = await MonitorService.getHostStatus(hostId);
+        const endTime = Date.now();
+        setLatency(endTime - startTime);
+        
+        if (serverData) {
+          setConnectionStatus('connected');
+          setData(prev => {
+            const newPoint = {
+              time: prev.length > 0 ? prev[prev.length - 1].time + 1 : 0,
+              cpu: serverData.cpuUsage || 0,
+              memory: serverData.memoryUsage || 0,
+              net: serverData.networkConn || 0, // 使用 networkConn 作为网络指标，或者是连接数
+              diskUsage: serverData.diskUsage || 0,
+              diskInfo: serverData.diskInfo || '0 GB / 0 GB',
+              fileStatus: serverData.fileStatus ? JSON.parse(serverData.fileStatus) : [],
+              timestamp: serverData.monitorTime
+            };
+            
+            const newData = [...prev, newPoint];
+            if (newData.length > MAX_DATA_POINTS) {
+              return newData.slice(newData.length - MAX_DATA_POINTS);
+            }
+            return newData;
+          });
+        } else {
+            // No data for this host yet
+            setConnectionStatus('disconnected');
+        }
+      } catch (err: any) {
+        console.error("Failed to fetch host data:", err);
+        setConnectionStatus('disconnected');
+        // 只有在完全连接失败时才认为是断开，404 可能只是暂时没有数据
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // 立即执行一次
+    fetchHostData();
+
+    // 轮询间隔 3秒
+    const interval = setInterval(fetchHostData, 3000);
 
     return () => clearInterval(interval);
-  }, [connectionStatus]);
+  }, [hostId]);
 
-  const latest = data[data.length - 1] || { cpu: 0, memory: 0, net: 0 };
+  const latest = data.length > 0 ? data[data.length - 1] : { 
+      cpu: 0, 
+      memory: 0, 
+      net: 0,
+      diskUsage: 0,
+      diskInfo: '0 GB / 0 GB',
+      fileStatus: []
+  };
 
   // Status Indicator Component
   const StatusBadge = () => {
@@ -102,9 +174,15 @@ const HostMonitoring: React.FC = () => {
               onChange={(e) => setHostId(e.target.value)}
               className="bg-cyber-950 border border-cyber-700 rounded px-4 py-2 text-white outline-none focus:border-cyber-accent"
             >
-              <option value="host-001">Web-Server-01 (10.0.0.5)</option>
-              <option value="host-002">DB-Cluster-Master (10.0.0.6)</option>
-              <option value="host-003">Backup-Node (192.168.1.20)</option>
+              {hosts.length > 0 ? (
+                hosts.map((host: any) => (
+                  <option key={host.id} value={host.hostIp}>
+                    {host.hostIp} (ID: {host.id})
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>No Hosts Configured</option>
+              )}
             </select>
           </div>
         </div>
@@ -178,6 +256,71 @@ const HostMonitoring: React.FC = () => {
              <p className="text-xs text-slate-500 mt-1">查看异常 PID 及资源占用</p>
            </div>
         </Link>
+      </div>
+
+      {/* [新增] 磁盘与文件监控 (Grid布局) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-slide-up">
+         {/* 磁盘使用状态 */}
+         <div className={`glass-panel rounded-xl p-6 relative ${connectionStatus === 'disconnected' ? 'opacity-50 grayscale' : ''}`}>
+            <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2 mb-4">
+               <HardDrive size={14} /> 磁盘空间 (System Root)
+            </h3>
+            <div className="flex items-end gap-2">
+               <span className="text-3xl font-mono font-bold text-white">{latest.diskInfo.split(' / ')[0] || '0 GB'}</span>
+               <span className="text-sm text-slate-500 mb-1">/ {latest.diskInfo.split(' / ')[1] || '0 GB'} Total</span>
+            </div>
+            
+            {/* 进度条 */}
+            <div className="mt-4 space-y-2">
+               <div className="flex justify-between text-xs text-slate-400">
+                  <span>Usage</span>
+                  <span className="text-white font-bold">{latest.diskUsage.toFixed(1)}%</span>
+               </div>
+               <div className="w-full h-3 bg-cyber-900 rounded-full overflow-hidden border border-cyber-800">
+                  <div className={`h-full rounded-full relative transition-all duration-1000 ${latest.diskUsage > 80 ? 'bg-red-500' : 'bg-blue-600'}`} style={{ width: `${latest.diskUsage}%` }}>
+                     <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                  </div>
+               </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-cyber-800 flex justify-between text-xs text-slate-500">
+               <div>Read: <span className="text-blue-400">-- MB/s</span></div>
+               <div>Write: <span className="text-purple-400">-- MB/s</span></div>
+            </div>
+         </div>
+
+         {/* 核心文件监控 */}
+         <div className={`glass-panel rounded-xl p-6 overflow-hidden ${connectionStatus === 'disconnected' ? 'opacity-50 grayscale' : ''}`}>
+            <div className="flex justify-between items-center mb-4">
+               <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                  <FileSearch size={14} /> 核心文件监控
+               </h3>
+               <span className="text-[10px] px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded">FIM Active</span>
+            </div>
+            
+            <div className="space-y-3 text-sm max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+               {latest.fileStatus && latest.fileStatus.length > 0 ? (
+                  latest.fileStatus.map((file: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-2 hover:bg-cyber-800/50 rounded transition-colors group">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            <FolderOpen size={16} className="text-slate-500 group-hover:text-cyber-accent flex-shrink-0" />
+                            <span className="text-slate-300 font-mono text-xs truncate" title={file.path}>
+                                {file.path.length > 30 ? '...' + file.path.slice(-25) : file.path}
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                            <span className={`text-xs font-bold ${file.status === 'Normal' ? 'text-emerald-400' : 'text-red-400 animate-pulse'}`}>
+                                {file.status}
+                            </span>
+                            <span className="text-[10px] text-slate-600">{file.lastMod}</span>
+                        </div>
+                    </div>
+                  ))
+               ) : (
+                  <div className="text-center text-slate-500 py-4">Waiting for agent report...</div>
+               )}
+            </div>
+         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[350px]">

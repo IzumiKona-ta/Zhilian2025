@@ -50,6 +50,7 @@ public class TracingServiceImpl implements TracingService {
 
     public void saveTracing(threatSourceTracing sourceTracing) {
         tracingMapper.insert(sourceTracing);
-        restTemplate.postForObject("http://localhost:8080/api/chain/trace", sourceTracing, String.class);
+        // 使用 [::1] 适配 Windows/WSL 环境
+        restTemplate.postForObject("http://[::1]:8080/api/chain/trace", sourceTracing, String.class);
     }
 }

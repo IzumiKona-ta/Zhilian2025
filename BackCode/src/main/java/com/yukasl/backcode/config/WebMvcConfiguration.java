@@ -28,6 +28,8 @@ public class WebMvcConfiguration extends WebMvcConfigurationSupport {
                 .addPathPatterns("/**")
                 .excludePathPatterns("/api/auth/login")
                 .excludePathPatterns("/api/analysis/alert") // 放行模拟攻击接口
-                .excludePathPatterns("/ids/stream"); // 放行WebSocket接口
+                .excludePathPatterns("/api/host/monitor/report") // 放行HIDS上报接口
+                .excludePathPatterns("/ids/stream") // 放行WebSocket接口
+                .excludePathPatterns("/error"); // 放行错误页面，避免404变为401
     }
 }

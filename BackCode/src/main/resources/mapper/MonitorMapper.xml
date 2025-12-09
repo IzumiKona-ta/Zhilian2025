@@ -2,7 +2,8 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.yukasl.backcode.mapper.MonitorMapper">
     <select id="queryHostMonitor" resultType="com.yukasl.backcode.pojo.entity.hostStatusMonitor">
-        select * from host_status_monitor
+        select id, host_id, cpu_usage, memory_usage, network_conn, disk_usage, disk_info, file_status, monitor_time, create_time 
+        from host_status_monitor
         <where>
             <if test="hostId != null">
                 and host_id = #{hostId}

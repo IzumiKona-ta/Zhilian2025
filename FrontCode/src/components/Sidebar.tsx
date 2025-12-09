@@ -18,7 +18,8 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
   const navItems = [
-    { to: '/', icon: LayoutDashboard, label: '数据采集配置' },
+    { to: '/', icon: LayoutDashboard, label: '首页' },
+    { to: '/collection', icon: Server, label: '数据采集配置' },
     { to: '/analysis', icon: Activity, label: '威胁分析中心' },
     { to: '/alerts', icon: ShieldAlert, label: '实时威胁预警' },
     { to: '/tracing', icon: Map, label: '攻击溯源图谱' },

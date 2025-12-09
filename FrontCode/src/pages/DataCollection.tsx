@@ -1,248 +1,199 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Play, Square, AlertCircle, Server, Clock, Globe, Activity, Wifi, WifiOff, Loader2 } from 'lucide-react';
-import { HostConfig } from '../types';
+import { Plus, Trash2, PlayCircle, StopCircle, Loader2, X, Save, AlertCircle, RefreshCw } from 'lucide-react';
+import { HostCollectionConfig } from '../types';
 import { ConfigService } from '../services/connector';
 
 const DataCollection: React.FC = () => {
-  const [config, setConfig] = useState<HostConfig>({
-    id: '1',
-    name: '默认节点配置',
-    ips: ['192.168.1.101', '10.0.0.55'],
-    frequency: 5,
-    status: 'Idle',
-  });
-  const [rawIps, setRawIps] = useState(config.ips.join('\n'));
-  const [ipStatus, setIpStatus] = useState<{total: number, valid: number, invalid: number}>({total: 0, valid: 0, invalid: 0});
-  const [isDirty, setIsDirty] = useState(false);
-  
-  // States for async actions
-  const [isTesting, setIsTesting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [connectionResults, setConnectionResults] = useState<Record<string, boolean>>({});
+  const [hosts, setHosts] = useState<HostCollectionConfig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState<{ hostIp: string; collectFreq: number }>({ hostIp: '', collectFreq: 5 });
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchHosts = async () => {
+    setLoading(true);
+    try {
+      const data = await ConfigService.getHostList();
+      // 修复：防御性检查，确保 setHosts 永远接收数组
+      setHosts(Array.isArray(data?.list) ? data.list : []);
+    } catch (err) {
+      console.error("Failed to fetch hosts", err);
+      setHosts([]); 
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const lines = rawIps.split('\n').map(l => l.trim()).filter(l => l);
-    let valid = 0;
-    let invalid = 0;
-    lines.forEach(ip => {
-        // Simple IPv4 regex check
-        if (/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$/.test(ip)) valid++;
-        else invalid++;
-    });
-    setIpStatus({ total: lines.length, valid, invalid });
-    setIsDirty(true);
-    setConnectionResults({}); // Reset test results on change
-  }, [rawIps]);
+    fetchHosts();
+  }, []);
 
-  const handleTestConnection = async () => {
-    setIsTesting(true);
-    setConnectionResults({});
-    const ips = rawIps.split('\n').map(ip => ip.trim()).filter(ip => ip !== '');
-    
-    // Simulate pinging each IP sequentially or in parallel
-    for (const ip of ips) {
-        await new Promise(r => setTimeout(r, 400)); // Simulate network latency per IP
-        // Mock result: 80% chance of success
-        setConnectionResults(prev => ({...prev, [ip]: Math.random() > 0.2}));
-    }
-    setIsTesting(false);
-  };
-
-  const handleSave = async () => {
-    if (ipStatus.invalid > 0) {
-      alert('无法保存：存在格式错误的 IP 地址，请检查输入。');
-      return;
-    }
-    
-    setIsSaving(true);
-    
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
     try {
-        const ips = rawIps.split('\n').map(ip => ip.trim()).filter(ip => ip !== '');
-        const newConfig = { ...config, ips };
-        
-        // 1. 调用真实后端接口保存配置
-        await ConfigService.updateConfig(newConfig);
-        
-        setConfig(newConfig);
-        setIsDirty(false);
+      await ConfigService.createHost({
+        hostIp: formData.hostIp,
+        collectFreq: formData.collectFreq,
+        collectStatus: 0 
+      });
+      setIsModalOpen(false);
+      setFormData({ hostIp: '', collectFreq: 5 });
+      fetchHosts();
     } catch (err) {
-        console.error("Save config failed:", err);
-        alert("保存配置失败，请检查网络连接或后端状态。");
+      console.error("Failed to create host", err);
+      alert("创建失败，请检查后端服务");
     } finally {
-        setIsSaving(false);
+      setSubmitting(false);
     }
   };
 
-  const toggleCollection = () => {
-    if (config.status === 'Collecting') {
-      setConfig(prev => ({ ...prev, status: 'Idle' }));
-    } else {
-      setConfig(prev => ({ ...prev, status: 'Collecting', lastCollection: new Date().toISOString() }));
+  const toggleStatus = async (host: HostCollectionConfig) => {
+    const newStatus = host.collectStatus === 1 ? 2 : 1;
+    try {
+      await ConfigService.updateHost(host.id, { collectStatus: newStatus });
+      setHosts(prev => prev.map(h => h.id === host.id ? { ...h, collectStatus: newStatus } : h));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("确定要删除此采集配置吗？")) return;
+    try {
+      await ConfigService.deleteHost(id);
+      setHosts(prev => prev.filter(h => h.id !== id));
+    } catch (err) {
+      console.error(err);
     }
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white font-mono">COLLECTION<span className="text-cyber-accent">.CONFIG</span></h2>
-          <p className="text-slate-400 text-sm mt-1">网络威胁数据采集源配置</p>
+          <h2 className="text-2xl font-bold text-white font-mono">COLLECTION<span className="text-cyber-accent">.MANAGER</span></h2>
+          <p className="text-slate-400 text-sm mt-1">云外主机采集节点配置中心</p>
         </div>
-        <div className={`px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-3 border backdrop-blur-md transition-all duration-500 ${
-          config.status === 'Collecting' 
-            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]' 
-            : 'bg-slate-800/50 text-slate-400 border-slate-700'
-        }`}>
-           <div className="relative">
-             <div className={`w-2.5 h-2.5 rounded-full ${config.status === 'Collecting' ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-             {config.status === 'Collecting' && <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping opacity-75"></div>}
-           </div>
-           采集引擎: {config.status === 'Collecting' ? '运行中' : '已停止'}
+        <div className="flex gap-3">
+          <button onClick={fetchHosts} className="p-2.5 bg-cyber-800 border border-cyber-700 rounded-lg hover:text-white text-slate-400 transition-colors">
+            <RefreshCw size={18} />
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-gradient-to-r from-cyber-accent to-blue-600 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg hover:shadow-cyber-accent/20 transition-all active:scale-95"
+          >
+            <Plus size={18} /> 新增节点
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Main IP Input Area */}
-        <div className="lg:col-span-8 glass-panel rounded-xl p-1 relative overflow-hidden">
-          <div className="bg-cyber-900/80 rounded-lg p-6 h-full flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-               <label className="flex items-center gap-2 text-sm font-bold text-cyber-accent uppercase tracking-wider">
-                 <Globe size={16} /> 目标主机列表 (IPv4/IPv6)
-               </label>
-               <div className="flex gap-3">
-                   <button 
-                     onClick={handleTestConnection}
-                     disabled={isTesting || ipStatus.total === 0}
-                     className="px-3 py-1.5 bg-cyber-800 hover:bg-cyber-700 border border-cyber-700 rounded-xs text-xs text-slate-300 flex items-center gap-2 transition-all disabled:opacity-50"
-                   >
-                     {isTesting ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />}
-                     测试连通性
-                   </button>
-                   <div className="text-xs space-x-3 flex bg-cyber-950 rounded-md px-3 py-1 border border-cyber-800 items-center">
-                      <span className="text-slate-400">总计: <span className="text-white font-mono">{ipStatus.total}</span></span>
-                      <span className="text-emerald-400">有效: <span className="font-mono">{ipStatus.valid}</span></span>
-                      {ipStatus.invalid > 0 && <span className="text-red-400 animate-pulse">无效: <span className="font-mono">{ipStatus.invalid}</span></span>}
-                   </div>
-               </div>
-            </div>
-            
-            <div className="relative flex-1">
-                <textarea
-                  value={rawIps}
-                  onChange={(e) => setRawIps(e.target.value)}
-                  spellCheck={false}
-                  disabled={isSaving}
-                  className="w-full h-full bg-cyber-950/50 border border-cyber-700 rounded-lg p-4 font-mono text-sm text-slate-300 focus:border-cyber-accent focus:ring-1 focus:ring-cyber-accent outline-none resize-none leading-relaxed shadow-inner"
-                  placeholder="192.168.1.1&#10;10.0.0.5..."
-                />
-                {/* Visual feedback for connection test */}
-                {Object.keys(connectionResults).length > 0 && (
-                    <div className="absolute top-4 right-4 flex flex-col gap-1 pointer-events-none">
-                        {rawIps.split('\n').map((ip, idx) => {
-                            const trimmed = ip.trim();
-                            if (!trimmed) return null;
-                            const result = connectionResults[trimmed];
-                            if (result === undefined) return <div key={idx} className="h-5"></div>; // Placeholder
-                            return (
-                                <div key={idx} className={`h-5 flex items-center justify-end animate-fade-in`}>
-                                    {result ? (
-                                        <span className="flex items-center gap-1 text-[10px] text-emerald-500 bg-emerald-500/10 px-1 rounded"><Wifi size={10} /> 在线</span>
-                                    ) : (
-                                        <span className="flex items-center gap-1 text-[10px] text-red-500 bg-red-500/10 px-1 rounded"><WifiOff size={10} /> 超时</span>
-                                    )}
-                                </div>
-                            )
-                        })}
+      <div className="glass-panel rounded-xl overflow-hidden min-h-[400px]">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-cyber-900/80 text-slate-400 uppercase text-xs font-bold border-b border-cyber-700">
+            <tr>
+              <th className="p-5 pl-6">ID</th>
+              <th className="p-5">主机 IP</th>
+              <th className="p-5">采集频率</th>
+              <th className="p-5">运行状态</th>
+              <th className="p-5">创建时间</th>
+              <th className="p-5 text-right pr-6">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-cyber-700/50 text-slate-300">
+            {loading ? (
+              <tr><td colSpan={6} className="p-10 text-center text-slate-500"><Loader2 className="animate-spin inline mr-2"/> 加载配置中...</td></tr>
+            ) : (hosts || []).length === 0 ? (
+              <tr><td colSpan={6} className="p-10 text-center text-slate-500"><AlertCircle className="inline mr-2 mb-1"/> 暂无数据，请尝试新增节点</td></tr>
+            ) : (
+              hosts.map(host => (
+                <tr key={host.id} className="hover:bg-cyber-800/30 transition-colors group">
+                  <td className="p-5 pl-6 font-mono text-xs text-slate-500">#{host.id}</td>
+                  <td className="p-5 font-bold text-white font-mono tracking-wide">{host.hostIp}</td>
+                  <td className="p-5 text-sm">{host.collectFreq} min</td>
+                  <td className="p-5">
+                    <span className={`inline-flex items-center gap-2 px-2.5 py-1 rounded text-xs font-bold border ${
+                      host.collectStatus === 1 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 
+                      host.collectStatus === 3 ? 'bg-red-500/10 text-red-400 border-red-500/30' : 
+                      'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {host.collectStatus === 1 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/>}
+                      {host.collectStatus === 1 ? 'Running' : host.collectStatus === 2 ? 'Paused' : host.collectStatus === 3 ? 'Error' : 'Stopped'}
+                    </span>
+                  </td>
+                  <td className="p-5 text-xs text-slate-500 font-mono">{host.createTime || '-'}</td>
+                  <td className="p-5 text-right pr-6">
+                    <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => toggleStatus(host)}
+                        className={`p-2 rounded border transition-colors ${
+                          host.collectStatus === 1 
+                            ? 'text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/10' 
+                            : 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10'
+                        }`}
+                        title={host.collectStatus === 1 ? "暂停采集" : "启动采集"}
+                      >
+                        {host.collectStatus === 1 ? <StopCircle size={16} /> : <PlayCircle size={16} />}
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(host.id)}
+                        className="p-2 text-red-400 border border-red-500/30 rounded hover:bg-red-500/10 transition-colors"
+                        title="删除配置"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                )}
-            </div>
-            
-            {ipStatus.invalid > 0 && (
-              <div className="mt-3 flex items-center gap-2 text-red-400 text-sm bg-red-500/5 p-2 rounded border border-red-500/20">
-                <AlertCircle size={16} />
-                <span>检测到格式错误的 IP 地址，请修正后保存。</span>
-              </div>
+                  </td>
+                </tr>
+              ))
             )}
-          </div>
-        </div>
+          </tbody>
+        </table>
+      </div>
 
-        {/* Configuration Sidebar */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Settings Card */}
-          <div className="glass-panel rounded-xl p-6 bg-gradient-to-b from-cyber-800/50 to-cyber-900/50">
-            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-              <Server size={20} className="text-cyber-accent" /> 采集参数
-            </h3>
-            
-            <div className="space-y-6">
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-cyber-900 border border-cyber-700 rounded-xl w-full max-w-md shadow-2xl p-6 space-y-5 animate-slide-up">
+            <div className="flex justify-between items-center border-b border-cyber-800 pb-4">
+              <h3 className="text-lg font-bold text-white">新建采集节点</h3>
+              <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-400 hover:text-white"/></button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">任务名称</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">主机 IP 地址</label>
                 <input 
-                  type="text" 
-                  value={config.name}
-                  onChange={(e) => setConfig({...config, name: e.target.value})}
-                  className="w-full bg-cyber-950 border border-cyber-700 rounded-lg p-3 text-sm text-white focus:border-cyber-accent outline-none"
+                  required
+                  className="w-full bg-cyber-950 border border-cyber-700 rounded-lg p-3 text-white outline-none focus:border-cyber-accent focus:ring-1 focus:ring-cyber-accent transition-all"
+                  placeholder="例如: 192.168.1.100"
+                  value={formData.hostIp}
+                  onChange={e => setFormData({...formData, hostIp: e.target.value})}
                 />
               </div>
-
               <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase mb-2">
-                  <Clock size={14} /> 采集频率
-                </label>
-                <div className="relative">
-                  <select 
-                    value={config.frequency}
-                    onChange={(e) => setConfig({...config, frequency: parseInt(e.target.value)})}
-                    className="w-full bg-cyber-950 border border-cyber-700 rounded-lg p-3 text-sm text-white appearance-none outline-none focus:border-cyber-accent cursor-pointer"
-                  >
-                    <option value={1}>高频 (1 分钟/次)</option>
-                    <option value={5}>标准 (5 分钟/次)</option>
-                    <option value={15}>低频 (15 分钟/次)</option>
-                    <option value={30}>节能 (30 分钟/次)</option>
-                  </select>
-                  <div className="absolute right-3 top-3.5 pointer-events-none text-slate-500">
-                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
-                  </div>
-                </div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">采集频率 (分钟)</label>
+                <input 
+                  type="number"
+                  min="1"
+                  max="60"
+                  required
+                  className="w-full bg-cyber-950 border border-cyber-700 rounded-lg p-3 text-white outline-none focus:border-cyber-accent focus:ring-1 focus:ring-cyber-accent transition-all"
+                  value={formData.collectFreq}
+                  onChange={e => setFormData({...formData, collectFreq: parseInt(e.target.value)})}
+                />
               </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-cyber-700 space-y-3">
               <button 
-                id="save-btn"
-                onClick={handleSave}
-                disabled={!isDirty || ipStatus.invalid > 0 || isSaving}
-                className="w-full flex items-center justify-center gap-2 bg-cyber-700 hover:bg-cyber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-all font-medium shadow-lg group relative overflow-hidden"
+                type="submit" 
+                disabled={submitting}
+                className="w-full py-3 bg-cyber-accent text-cyber-900 font-bold rounded-lg hover:bg-cyan-400 transition-colors flex justify-center items-center gap-2 mt-2"
               >
-                {isSaving && (
-                    <div className="absolute inset-0 bg-cyber-accent/20 animate-pulse"></div>
-                )}
-                {isSaving ? (
-                    <><Loader2 size={18} className="animate-spin" /> 正在下发配置...</>
-                ) : (
-                    <><Save size={18} /> {isDirty ? '保存配置变更' : '配置已保存'}</>
-                )}
+                {submitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                {submitting ? '保存中...' : '确认添加'}
               </button>
-              
-              <button 
-                onClick={toggleCollection}
-                className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg transition-all font-bold shadow-lg transform active:scale-95 ${
-                  config.status === 'Collecting' 
-                    ? 'bg-red-500/10 text-red-400 border border-red-500/50 hover:bg-red-500/20'
-                    : 'bg-gradient-to-r from-cyber-accent to-blue-500 text-white hover:shadow-cyber-accent/30'
-                }`}
-              >
-                {config.status === 'Collecting' ? (
-                  <><Square size={18} fill="currentColor" /> 停止采集任务</>
-                ) : (
-                  <><Play size={18} fill="currentColor" /> 立即开始采集</>
-                )}
-              </button>
-            </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

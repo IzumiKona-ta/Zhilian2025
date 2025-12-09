@@ -33,37 +33,34 @@ const ThreatAlerts: React.FC = () => {
 
   // 2. 实时监控: 使用 IDSSocket 连接
   useEffect(() => {
-    if (isLive) {
-      if (!socketRef.current) {
-        socketRef.current = new IDSSocket();
-      }
+    // 强制自动连接
+    if (!socketRef.current) {
+      socketRef.current = new IDSSocket();
+    }
 
-      socketRef.current.connect(
-        (newThreat: ThreatEvent) => {
-          // 收到新威胁
-          setThreats(prev => [newThreat, ...prev]);
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = 0;
-          }
-        },
-        (status: boolean) => {
-          setWsConnected(status);
+    socketRef.current.connect(
+      (newThreat: ThreatEvent) => {
+        // 收到新威胁
+        setThreats(prev => [newThreat, ...prev]);
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
         }
-      );
-    } else {
+      },
+      (status: boolean) => {
+        setWsConnected(status);
+        // 如果连接成功，自动视为 "Live" 状态
+        if (status) setIsLive(true);
+      }
+    );
+
+    // 清理函数：组件卸载时断开
+    return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
-      setWsConnected(false);
-    }
-
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
     };
-  }, [isLive]);
+  }, []); // 只在组件挂载时执行一次
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -129,24 +126,24 @@ const ThreatAlerts: React.FC = () => {
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono transition-all ${
               wsConnected 
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                : 'bg-cyber-900 border-cyber-700 text-slate-500'
+                : 'bg-red-500/10 border-red-500/30 text-red-400'
             }`}>
               {wsConnected ? <Wifi size={14} className="animate-pulse" /> : <WifiOff size={14} />}
               {wsConnected ? 'IDS_LINK_ACTIVE' : 'IDS_LINK_DOWN'}
             </div>
 
             <button 
-              onClick={() => setIsLive(!isLive)}
-              className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-sm transition-all shadow-lg ${
-                isLive 
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30' 
-                  : 'bg-cyber-accent text-cyber-900 hover:bg-cyan-400'
+              disabled={true} // 按钮不再具有交互功能，仅作为状态展示
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-sm transition-all shadow-lg cursor-default opacity-80 ${
+                 wsConnected
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' 
+                  : 'bg-slate-700 text-slate-400 border border-slate-600'
               }`}
             >
-              {isLive ? (
-                <> <Activity size={18} className="animate-spin" /> 停止监控 </>
+              {wsConnected ? (
+                <> <Activity size={18} className="animate-pulse" /> 实时监控中 </>
               ) : (
-                <> <Activity size={18} /> 开启实时监控 </>
+                <> <Loader2 size={18} className="animate-spin" /> 连接中... </>
               )}
             </button>
          </div>

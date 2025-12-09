@@ -1,42 +1,79 @@
 import React, { useState, useEffect } from 'react';
 import { ComposedChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar } from 'recharts';
 import { Filter, Download, RefreshCw, Loader2, FileCheck } from 'lucide-react';
-
-const initialData = [
-  { name: '00:00', attacks: 120, traffic: 45 },
-  { name: '04:00', attacks: 80, traffic: 30 },
-  { name: '08:00', attacks: 250, traffic: 85 },
-  { name: '12:00', attacks: 380, traffic: 90 },
-  { name: '16:00', attacks: 210, traffic: 65 },
-  { name: '20:00', attacks: 340, traffic: 78 },
-  { name: '23:59', attacks: 190, traffic: 50 },
-];
+import { AnalysisService } from '../services/connector';
 
 const ThreatAnalysis: React.FC = () => {
   const [timeRange, setTimeRange] = useState('24h');
-  const [chartData, setChartData] = useState(initialData);
+  const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
 
-  // Simulate data fetching when timeRange changes
+  // Fetch real data when timeRange changes
   useEffect(() => {
     fetchData(timeRange);
   }, [timeRange]);
 
-  const fetchData = (range: string) => {
+  const fetchData = async (range: string) => {
     setLoading(true);
-    // Simulate database query time
-    setTimeout(() => {
-      // Generate some pseudo-random data based on range
-      const newData = initialData.map(item => ({
-        ...item,
-        attacks: Math.floor(Math.random() * (range === '24h' ? 400 : 2000)) + 50,
-        traffic: Math.floor(Math.random() * 100)
-      }));
-      setChartData(newData);
+    try {
+      // 获取真实数据 (Page 1, 100 records)
+      const data = await AnalysisService.getTraffic(1, 100);
+      
+      // 数据处理与聚合
+      const processedData = processData(data);
+      setChartData(processedData);
+    } catch (error) {
+      console.error("Failed to fetch analysis data:", error);
+    } finally {
       setLoading(false);
-    }, 800);
+    }
+  };
+
+  const processData = (data: any[]) => {
+    if (!data || data.length === 0) return [];
+
+    // 按小时聚合攻击次数
+    const buckets: Record<string, { attacks: number }> = {};
+    
+    data.forEach(item => {
+      // Robust date parsing
+      let date: Date;
+      if (typeof item.statTime === 'string') {
+          // Replace space with T to ensure ISO format compatibility across browsers
+          // Handle 'yyyy-MM-dd HH:mm:ss' -> 'yyyy-MM-ddTHH:mm:ss'
+          date = new Date(item.statTime.replace(' ', 'T'));
+      } else if (Array.isArray(item.statTime)) {
+          // Handle [yyyy, MM, dd, HH, mm, ss]
+          const [year, month, day, hour, minute, second] = item.statTime;
+          date = new Date(year, month - 1, day, hour, minute, second);
+      } else if (item.statTime instanceof Date) {
+          date = item.statTime;
+      } else {
+          date = new Date(); // Fallback to now if invalid
+      }
+
+      if (isNaN(date.getTime())) {
+          return; // Skip invalid dates
+      }
+
+      const hour = date.getHours().toString().padStart(2, '0');
+      const minute = "00"; // Bucket by hour
+      const timeKey = `${hour}:${minute}`;
+      
+      if (!buckets[timeKey]) {
+        buckets[timeKey] = { attacks: 0 };
+      }
+      buckets[timeKey].attacks += (item.attackCount || 1);
+    });
+
+    // 转换为数组并排序
+    return Object.keys(buckets).sort().map(key => ({
+      name: key,
+      attacks: buckets[key].attacks,
+      traffic: 0 // 暂时没有真实流量大小数据，置为0或移除
+    }));
   };
 
   const handleRefresh = () => {

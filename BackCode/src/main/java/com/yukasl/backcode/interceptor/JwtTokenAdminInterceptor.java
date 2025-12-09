@@ -40,6 +40,14 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
 
         //1、从请求头中获取令牌
         String token = request.getHeader(jwtProperties.getAdminTokenName());
+        
+        // 如果获取不到，尝试从 Authorization 头获取 (Bearer token)
+        if (token == null || token.isEmpty()) {
+            String bearerToken = request.getHeader("Authorization");
+            if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+                token = bearerToken.substring(7);
+            }
+        }
 
         //2、校验令牌
         try {

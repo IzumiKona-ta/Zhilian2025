@@ -13,4 +13,6 @@ public interface MonitorService {
     PageResult queryProcessMonitor(ProcessMonitorDTO processMonitorDTO);
 
     void updateProcessMonitor(String id, ProcessMonitorDTO processMonitorDTO);
+
+    void saveHostStatus(hostStatusMonitor status);
 }
