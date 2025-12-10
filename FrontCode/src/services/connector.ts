@@ -17,6 +17,7 @@ const ENDPOINTS = {
   
   // --- 威胁情报与处置接口 ---
   THREAT_BLOCK: (id: string) => `/threats/${id}/block`,     // 阻断攻击源 IP (POST)
+  THREAT_UNBLOCK: (id: string) => `/threats/${id}/unblock`, // 解封攻击源 IP (POST)
   THREAT_RESOLVE: (id: string) => `/threats/${id}/resolve`, // 标记事件已解决 (POST)
   THREAT_HISTORY: '/analysis/alert',                        // 获取历史威胁记录 (GET)
 
@@ -283,6 +284,11 @@ export const ThreatService = {
   // 下发 IP 阻断指令
   blockIp: async (threatId: string): Promise<void> => {
     return api.post(ENDPOINTS.THREAT_BLOCK(threatId));
+  },
+
+  // 下发 IP 解封指令
+  unblockIp: async (threatId: string): Promise<void> => {
+    return api.post(ENDPOINTS.THREAT_UNBLOCK(threatId));
   },
   
   // 标记威胁为"误报"或"已解决"

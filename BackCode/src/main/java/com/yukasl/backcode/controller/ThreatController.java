@@ -64,6 +64,46 @@ public class ThreatController {
     }
     
     /**
+     * 下发 IP 解封指令
+     * @param id 威胁ID
+     */
+    @PostMapping("/{id}/unblock")
+    public Result<String> unblockIp(@PathVariable Integer id) {
+        log.info("收到解封请求，威胁ID: {}", id);
+
+        potentialThreatAlert alert = analysisService.queryAlertById(id);
+        if (alert == null) {
+            return Result.error("Threat event not found");
+        }
+
+        String scope = alert.getImpactScope();
+        if (scope == null || !scope.contains("->")) {
+            return Result.error("Cannot parse IPs from impact scope");
+        }
+
+        try {
+            String[] parts = scope.split("\\|");
+            String flow = parts[0].trim();
+            String[] ips = flow.split("->");
+
+            String srcIp = ips[0].trim().split(":")[0];
+            String dstIp = ips[1].trim().split(":")[0];
+
+            // 生成解封指令
+            String command = "UNBLOCK_IP " + srcIp;
+
+            commandQueueService.addCommand(dstIp, command);
+
+            log.info("已生成解封指令 '{}' 给主机 {}", command, dstIp);
+            return Result.success("Unblock command queued for host " + dstIp);
+
+        } catch (Exception e) {
+            log.error("解析 IP 失败", e);
+            return Result.error("Failed to parse IP addresses");
+        }
+    }
+
+    /**
      * 标记误报/已解决
      */
     @PostMapping("/{id}/resolve")

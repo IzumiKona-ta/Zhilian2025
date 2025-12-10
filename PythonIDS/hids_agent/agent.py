@@ -114,6 +114,20 @@ def execute_command(cmd):
                 # Linux iptables Block
                 subprocess.run(f"iptables -A INPUT -s {ip} -j DROP", shell=True)
                 print(f"[+] iptables rule added for {ip}")
+        
+        elif cmd.startswith("UNBLOCK_IP"):
+            ip = cmd.split()[1]
+            print(f"[!] UNBLOCKING IP: {ip}")
+
+            if platform.system() == "Windows":
+                # Windows Firewall Unblock
+                rule_name = f"Block_{ip}"
+                subprocess.run(f'netsh advfirewall firewall delete rule name="{rule_name}"', shell=True)
+                print(f"[+] Firewall rule removed for {ip}")
+            else:
+                # Linux iptables Unblock
+                subprocess.run(f"iptables -D INPUT -s {ip} -j DROP", shell=True)
+                print(f"[+] iptables rule removed for {ip}")
                 
     except Exception as e:
         print(f"[!] Command execution failed: {e}")

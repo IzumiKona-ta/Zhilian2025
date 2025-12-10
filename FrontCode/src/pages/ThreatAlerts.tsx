@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MOCK_THREATS } from '../utils/constants';
-import { AlertTriangle, ShieldX, Eye, ChevronDown, ChevronUp, Wifi, WifiOff, Activity, Loader2 } from 'lucide-react';
+import { AlertTriangle, ShieldX, Eye, ChevronDown, ChevronUp, Wifi, WifiOff, Activity, Loader2, Unlock } from 'lucide-react';
 import { ThreatEvent, RiskLevel } from '../types';
 import { IDSSocket, ThreatService } from '../services/connector';
 
@@ -11,7 +11,7 @@ const ThreatAlerts: React.FC = () => {
   const [wsConnected, setWsConnected] = useState(false); // 真实连接状态
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
-  const [processingAction, setProcessingAction] = useState<{id: string, type: 'block' | 'resolve'} | null>(null);
+  const [processingAction, setProcessingAction] = useState<{id: string, type: 'block' | 'resolve' | 'unblock'} | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<IDSSocket | null>(null);
 
@@ -78,6 +78,22 @@ const ThreatAlerts: React.FC = () => {
     } catch (error) {
       console.error("Block failed", error);
       alert("阻断指令下发失败，请检查后端日志");
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  const handleUnblock = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setProcessingAction({ id, type: 'unblock' });
+    
+    try {
+      await ThreatService.unblockIp(id);
+      // 解封后状态回退为 Pending，或者可以标记为 "Resolved" 或其他状态，这里暂且回退为 Pending 以便再次操作
+      setThreats(prev => prev.map(t => t.id === id ? { ...t, status: 'Pending' } : t));
+    } catch (error) {
+      console.error("Unblock failed", error);
+      alert("解封指令下发失败，请检查后端日志");
     } finally {
       setProcessingAction(null);
     }
@@ -279,6 +295,22 @@ const ThreatAlerts: React.FC = () => {
                         </button>
                       </>
                     )}
+
+                    {threat.status === 'Blocked' && (
+                      <button 
+                        onClick={(e) => handleUnblock(threat.id, e)}
+                        disabled={processingAction?.id === threat.id}
+                        className="px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 rounded hover:bg-emerald-500/30 flex items-center gap-2 text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        {processingAction?.id === threat.id && processingAction.type === 'unblock' ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Unlock size={16} />
+                        )}
+                        {processingAction?.id === threat.id && processingAction.type === 'unblock' ? '正在解封...' : '解除封禁'}
+                      </button>
+                    )}
+
                     <button className="px-4 py-2 bg-cyber-800 text-slate-300 border border-cyber-700 rounded hover:bg-cyber-700 flex items-center gap-2 text-sm">
                       <Eye size={16} /> 关联溯源
                     </button>
