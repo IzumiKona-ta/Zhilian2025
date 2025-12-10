@@ -122,13 +122,13 @@ echo       - Installing Python dependencies...
 
 :: Install Python deps globally (or create venv if preferred, but keeping it simple for now)
 echo       (Installing requirements.txt in background...)
-start /wait /min cmd /c "pip install -r PythonIDS/requirements.txt"
+start /wait /min /D "%~dp0" cmd /c "pip install -r PythonIDS/requirements.txt"
 
 echo       - Starting Anomaly Detection Engine (ML IDS)...
 start "ML IDS Engine" /D "%~dp0" cmd /k "title ML IDS Engine && python PythonIDS/anomaly_based_ids/realtime_detection_fixed.py"
 
 echo       - Starting HIDS Agent (Host Monitor) [Requesting Admin Privileges]...
-powershell -Command "Start-Process cmd -ArgumentList '/k chcp 65001 && title HIDS Agent && python PythonIDS/hids_agent/agent.py' -Verb RunAs -WorkingDirectory '%~dp0'"
+powershell -Command "Start-Process cmd -ArgumentList '/k chcp 65001 && title HIDS Agent && cd /d \"%~dp0.\" && python PythonIDS/hids_agent/agent.py' -Verb RunAs"
 
 :: Optional Rule Based IDS
 :: start "Rule IDS" /D "%~dp0" cmd /k "title Rule Based IDS && python RuleBasedIDS/mini_snort_pro.py"

@@ -43,26 +43,59 @@ const ThreatAlerts: React.FC = () => {
 
   const handleManualBlockSubmit = async () => {
     if (!newBlockIp) return;
+    setBlacklistLoading(true); 
     try {
         await ThreatService.manualBlock(newBlockIp);
+        const currentIp = newBlockIp; // Capture current value
         setNewBlockIp('');
-        // Wait a bit for the command to be processed
-        setTimeout(fetchBlockedIps, 1000);
+        
+        // 轮询检查是否生效 (最多尝试 5 次，每次间隔 1 秒)
+        let attempts = 0;
+        const checkInterval = setInterval(async () => {
+            attempts++;
+            try {
+                const ips = await ThreatService.getBlockedIps();
+                // 如果新IP已出现在列表中，或者是最后一次尝试
+                if (ips.includes(currentIp) || attempts >= 5) {
+                    setBlockedIps(ips);
+                    setBlacklistLoading(false);
+                    clearInterval(checkInterval);
+                }
+            } catch (e) {
+                // Ignore transient errors during polling
+            }
+        }, 1000);
+        
     } catch (error) {
         console.error("Manual block failed", error);
         alert("添加黑名单失败");
+        setBlacklistLoading(false);
     }
   };
 
   const handleManualUnblockSubmit = async (ip: string) => {
     if (!window.confirm(`确定要解封 IP ${ip} 吗？`)) return;
+    setBlacklistLoading(true); // 立即显示加载状态
     try {
         await ThreatService.manualUnblock(ip);
-        // Wait a bit for the command to be processed
-        setTimeout(fetchBlockedIps, 1000);
+        
+        // 轮询检查是否生效
+        let attempts = 0;
+        const checkInterval = setInterval(async () => {
+            attempts++;
+            const ips = await ThreatService.getBlockedIps();
+            // 如果IP已消失，或者是最后一次尝试
+            if (!ips.includes(ip) || attempts >= 5) {
+                setBlockedIps(ips);
+                setBlacklistLoading(false);
+                clearInterval(checkInterval);
+            }
+        }, 1000);
+
     } catch (error) {
         console.error("Manual unblock failed", error);
         alert("解封失败");
+        setBlacklistLoading(false);
     }
   };
 
