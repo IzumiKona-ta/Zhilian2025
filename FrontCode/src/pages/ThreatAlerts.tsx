@@ -70,12 +70,17 @@ const ThreatAlerts: React.FC = () => {
     e.stopPropagation();
     setProcessingAction({ id, type: 'block' });
     
-    // 真实场景：调用 API 下发阻断策略
-    // await api.post(`/threats/${id}/block`);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setThreats(prev => prev.map(t => t.id === id ? { ...t, status: 'Blocked' } : t));
-    setProcessingAction(null);
+    try {
+      // 真实调用后端接口
+      await ThreatService.blockIp(id);
+      
+      setThreats(prev => prev.map(t => t.id === id ? { ...t, status: 'Blocked' } : t));
+    } catch (error) {
+      console.error("Block failed", error);
+      alert("阻断指令下发失败，请检查后端日志");
+    } finally {
+      setProcessingAction(null);
+    }
   };
 
   const handleResolve = async (id: string, e: React.MouseEvent) => {

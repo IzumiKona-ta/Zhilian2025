@@ -10,11 +10,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import com.yukasl.backcode.service.CommandQueueService;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+
 @RestController
 @Slf4j
 public class MonitorController {
     @Autowired
     private MonitorService monitorService;
+
+    @Autowired
+    private CommandQueueService commandQueueService;
 
     @GetMapping("/api/host/monitor")
     public Result<PageResult> queryHostMonitor(HostMonitorDTO hostMonitorDTO) {
@@ -47,9 +56,22 @@ public class MonitorController {
     }
 
     @PostMapping("/api/host/monitor/report")
-    public Result<String> reportHostStatus(@RequestBody hostStatusMonitor status) {
-        log.info("接收到主机上报状态: {}", status);
+    public Result<Map<String, Object>> reportHostStatus(@RequestBody hostStatusMonitor status) {
+        // 1. 保存状态
         monitorService.saveHostStatus(status);
-        return Result.success("Status received");
+        
+        // 2. 检查是否有待执行指令
+        Map<String, Object> responseData = new HashMap<>();
+        responseData.put("status", "received");
+        
+        String command = commandQueueService.pollCommand(status.getHostId());
+        if (command != null) {
+            log.info("向主机 {} 下发指令: {}", status.getHostId(), command);
+            List<String> commands = new ArrayList<>();
+            commands.add(command);
+            responseData.put("commands", commands);
+        }
+        
+        return Result.success(responseData);
     }
 }

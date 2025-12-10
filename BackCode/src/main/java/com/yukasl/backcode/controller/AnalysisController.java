@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.yukasl.backcode.service.CommandQueueService;
+
 /**
  * 威胁数据分析预测模块
  */
@@ -25,6 +27,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class AnalysisController {
     @Autowired
     private AnalysisService analysisService;
+
+    @Autowired
+    private CommandQueueService commandQueueService;
 
     @Autowired
     private ObjectMapper objectMapper;

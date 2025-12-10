@@ -51,8 +51,6 @@ graph TD
 | **ML IDS** | AI 威胁检测 | **动态** | Python, PyTorch, Scapy | `realtime_detection_fixed.py` |
 | **HIDS Agent** | 主机监控探针 | **动态** | Python, Psutil | `agent.py` |
 
-> **注意**: 后端端口已确认为 **8081**，避免与常见服务冲突。
-
 ---
 
 ## 3. 组件深度解析 (Detailed Component Analysis)
@@ -183,6 +181,3 @@ graph TD
 *   目前系统已处于高度稳定状态。若需重启，请直接使用 `start_project.bat`，系统会自动处理所有依赖与配置。
 
 ---
-
-> **签署**: Trae (AI 高级架构师)
-> **致**: Zhilian2025 项目组

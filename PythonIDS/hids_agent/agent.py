@@ -95,6 +95,29 @@ def collect_metrics():
         "fileStatus": file_status
     }
 
+import subprocess
+
+def execute_command(cmd):
+    try:
+        print(f"[*] Received command: {cmd}")
+        if cmd.startswith("BLOCK_IP"):
+            ip = cmd.split()[1]
+            print(f"[!] BLOCKING IP: {ip}")
+            
+            if platform.system() == "Windows":
+                # Windows Firewall Block
+                rule_name = f"Block_{ip}"
+                # Use subprocess to hide output or handle errors better
+                subprocess.run(f'netsh advfirewall firewall add rule name="{rule_name}" dir=in action=block remoteip={ip}', shell=True)
+                print(f"[+] Firewall rule added for {ip}")
+            else:
+                # Linux iptables Block
+                subprocess.run(f"iptables -A INPUT -s {ip} -j DROP", shell=True)
+                print(f"[+] iptables rule added for {ip}")
+                
+    except Exception as e:
+        print(f"[!] Command execution failed: {e}")
+
 def main():
     print(f"[*] Waiting for backend at {BACKEND_URL}...")
     while True:
@@ -105,6 +128,19 @@ def main():
             
             if response.status_code == 200:
                 print(f"[+] Reported: CPU={metrics['cpuUsage']}% MEM={metrics['memoryUsage']}% NET={metrics['networkConn']}")
+                
+                # Check for commands
+                try:
+                    data = response.json()
+                    if isinstance(data, dict) and data.get("data") and isinstance(data["data"], dict):
+                         # Result<Map> format: {code:1, data: {status:..., commands: [...]}}
+                         inner_data = data["data"]
+                         if "commands" in inner_data:
+                             for cmd in inner_data["commands"]:
+                                 execute_command(cmd)
+                except Exception as json_err:
+                    pass # Not a JSON response or invalid format
+                    
             else:
                 print(f"[-] Failed to report: {response.status_code} - {response.text}")
                 
