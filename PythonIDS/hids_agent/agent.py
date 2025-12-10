@@ -209,6 +209,7 @@ def execute_command(cmd):
 
             else:
                 # Linux iptables Block
+<<<<<<< HEAD
                 full_cmd = f"iptables -A INPUT -s {ip} -j DROP"
                 res = subprocess.run(full_cmd, shell=True, capture_output=True, text=True)
                 if res.returncode == 0:
@@ -216,6 +217,10 @@ def execute_command(cmd):
                     update_blocked_ips(ip, "add")
                 else:
                     print(f"[-] FAILED to add iptables rule: {res.stderr.strip()}")
+=======
+                subprocess.run(f"iptables -A INPUT -s {ip} -j DROP", shell=True)
+                print(f"[+] iptables rule added for {ip}")
+>>>>>>> f349a90129b9f0c3c78e0577cf408dd8154a9342
         
         elif cmd.startswith("UNBLOCK_IP"):
             ip = cmd.split()[1]
@@ -224,6 +229,7 @@ def execute_command(cmd):
             if platform.system() == "Windows":
                 # Windows Firewall Unblock
                 rule_name = f"Block_{ip}"
+<<<<<<< HEAD
                 full_cmd = f'netsh advfirewall firewall delete rule name="{rule_name}"'
                 
                 # Using text=False (default) to avoid UnicodeDecodeError on Windows with GBK/CP936 output
@@ -252,6 +258,14 @@ def execute_command(cmd):
                      update_blocked_ips(ip, "remove")
                 else:
                      print(f"[-] FAILED to remove iptables rule: {res.stderr.strip()}")
+=======
+                subprocess.run(f'netsh advfirewall firewall delete rule name="{rule_name}"', shell=True)
+                print(f"[+] Firewall rule removed for {ip}")
+            else:
+                # Linux iptables Unblock
+                subprocess.run(f"iptables -D INPUT -s {ip} -j DROP", shell=True)
+                print(f"[+] iptables rule removed for {ip}")
+>>>>>>> f349a90129b9f0c3c78e0577cf408dd8154a9342
                 
     except Exception as e:
         print(f"[!] Command execution failed: {e}")
