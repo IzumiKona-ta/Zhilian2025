@@ -65,6 +65,15 @@ public class MonitorController {
         responseData.put("status", "received");
         
         String command = commandQueueService.pollCommand(status.getHostId());
+        
+        // 如果特定主机的队列为空，且主机ID不是 127.0.0.1，尝试检查 127.0.0.1 的队列 (作为默认通道)
+        if (command == null && !"127.0.0.1".equals(status.getHostId())) {
+             command = commandQueueService.pollCommand("127.0.0.1");
+             if (command != null) {
+                 log.info("从默认通道(127.0.0.1)向主机 {} 下发指令: {}", status.getHostId(), command);
+             }
+        }
+
         if (command != null) {
             log.info("向主机 {} 下发指令: {}", status.getHostId(), command);
             List<String> commands = new ArrayList<>();

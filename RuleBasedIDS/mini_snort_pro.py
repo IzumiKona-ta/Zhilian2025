@@ -32,6 +32,8 @@ import re
 import time
 import logging
 import ipaddress
+import os
+import socket
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
@@ -44,6 +46,8 @@ from datetime import datetime
 # Backnode API Configuration
 # -------------------------
 BACKNODE_API_URL = "http://localhost:8081/api/analysis/alert"
+BLOCKED_IPS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../blocked_ips.json")
+TRUSTED_IPS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../trusted_ips.json")
 
 # -------------------------
 # scapy 用于抓包/解析
@@ -365,8 +369,78 @@ class MiniSnortEngine:
         self.rules = rules
         self.alert_logfile = alert_logfile
         self.stats = Stats()
+        self.blocked_ips = set()
+        self.trusted_ips = set()
+        self.last_reload_time = 0
+        self.reload_ips()
+
+    def reload_ips(self):
+        try:
+            # Reload every 3 seconds
+            if time.time() - self.last_reload_time < 3:
+                return
+            
+            # Load Blocked IPs
+            if os.path.exists(BLOCKED_IPS_FILE):
+                with open(BLOCKED_IPS_FILE, "r", encoding="utf-8") as f:
+                    ips = json.load(f)
+                    self.blocked_ips = set(ips)
+            else:
+                self.blocked_ips = set()
+
+            # Load Trusted IPs (File)
+            file_trusted_ips = set()
+            if os.path.exists(TRUSTED_IPS_FILE):
+                with open(TRUSTED_IPS_FILE, "r", encoding="utf-8") as f:
+                    ips = json.load(f)
+                    file_trusted_ips = set(ips)
+            
+            # Auto-detect Local IPs (Dynamic)
+            local_ips = set()
+            local_ips.add("127.0.0.1")
+            local_ips.add("::1")
+            try:
+                # Method 1: Hostname resolution
+                hostname = socket.gethostname()
+                for ip in socket.gethostbyname_ex(hostname)[2]:
+                    local_ips.add(ip)
+            except:
+                pass
+            try:
+                # Method 2: Connect probe
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                local_ips.add(s.getsockname()[0])
+                s.close()
+            except:
+                pass
+            
+            # Merge both
+            self.trusted_ips = file_trusted_ips.union(local_ips)
+            
+            self.last_reload_time = time.time()
+        except Exception as e:
+            # Silent fail or debug log to avoid spam
+            pass
 
     def process_packet(self, packet):
+        self.reload_ips()
+
+        # Check for blocked source IP
+        src_ip = None
+        if IP in packet:
+            src_ip = packet[IP].src
+        elif IPv6 in packet:
+            src_ip = packet[IPv6].src
+            
+        if src_ip:
+            if src_ip in self.blocked_ips:
+                # Ignore traffic from blocked IPs
+                return
+            if src_ip in self.trusted_ips:
+                # Ignore traffic from trusted IPs (Whitelist)
+                return
+
         self.stats.total_packets += 1
         hits = match_packet(packet, self.rules)
         if hits:

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MOCK_THREATS } from '../utils/constants';
-import { AlertTriangle, ShieldX, Eye, ChevronDown, ChevronUp, Wifi, WifiOff, Activity, Loader2 } from 'lucide-react';
+import { AlertTriangle, ShieldX, Eye, ChevronDown, ChevronUp, Wifi, WifiOff, Activity, Loader2, Unlock, List, Trash2, Plus, X } from 'lucide-react';
 import { ThreatEvent, RiskLevel } from '../types';
 import { IDSSocket, ThreatService } from '../services/connector';
 
@@ -11,9 +11,61 @@ const ThreatAlerts: React.FC = () => {
   const [wsConnected, setWsConnected] = useState(false); // 真实连接状态
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
-  const [processingAction, setProcessingAction] = useState<{id: string, type: 'block' | 'resolve'} | null>(null);
+  const [processingAction, setProcessingAction] = useState<{id: string, type: 'block' | 'resolve' | 'unblock'} | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<IDSSocket | null>(null);
+
+  // --- Firewall Blacklist State ---
+  const [showBlacklist, setShowBlacklist] = useState(false);
+  const [blockedIps, setBlockedIps] = useState<string[]>([]);
+  const [newBlockIp, setNewBlockIp] = useState('');
+  const [blacklistLoading, setBlacklistLoading] = useState(false);
+
+  // Fetch blocked IPs
+  const fetchBlockedIps = async () => {
+    setBlacklistLoading(true);
+    try {
+        const ips = await ThreatService.getBlockedIps();
+        setBlockedIps(ips);
+    } catch (error) {
+        console.error("Failed to fetch blocked IPs", error);
+        alert("获取黑名单失败");
+    } finally {
+        setBlacklistLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showBlacklist) {
+        fetchBlockedIps();
+    }
+  }, [showBlacklist]);
+
+  const handleManualBlockSubmit = async () => {
+    if (!newBlockIp) return;
+    try {
+        await ThreatService.manualBlock(newBlockIp);
+        setNewBlockIp('');
+        // Wait a bit for the command to be processed
+        setTimeout(fetchBlockedIps, 1000);
+    } catch (error) {
+        console.error("Manual block failed", error);
+        alert("添加黑名单失败");
+    }
+  };
+
+  const handleManualUnblockSubmit = async (ip: string) => {
+    if (!window.confirm(`确定要解封 IP ${ip} 吗？`)) return;
+    try {
+        await ThreatService.manualUnblock(ip);
+        // Wait a bit for the command to be processed
+        setTimeout(fetchBlockedIps, 1000);
+    } catch (error) {
+        console.error("Manual unblock failed", error);
+        alert("解封失败");
+    }
+  };
+
 
   // 1. 初始化: 加载历史数据
   useEffect(() => {
@@ -83,6 +135,22 @@ const ThreatAlerts: React.FC = () => {
     }
   };
 
+  const handleUnblock = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setProcessingAction({ id, type: 'unblock' });
+    
+    try {
+      await ThreatService.unblockIp(id);
+      // 解封后状态回退为 Pending，或者可以标记为 "Resolved" 或其他状态，这里暂且回退为 Pending 以便再次操作
+      setThreats(prev => prev.map(t => t.id === id ? { ...t, status: 'Pending' } : t));
+    } catch (error) {
+      console.error("Unblock failed", error);
+      alert("解封指令下发失败，请检查后端日志");
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
   const handleResolve = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setProcessingAction({ id, type: 'resolve' });
@@ -128,6 +196,13 @@ const ThreatAlerts: React.FC = () => {
          </div>
          
          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setShowBlacklist(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-600 bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all"
+            >
+              <List size={14} /> 防火墙黑名单
+            </button>
+
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono transition-all ${
               wsConnected 
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
@@ -279,6 +354,22 @@ const ThreatAlerts: React.FC = () => {
                         </button>
                       </>
                     )}
+
+                    {threat.status === 'Blocked' && (
+                      <button 
+                        onClick={(e) => handleUnblock(threat.id, e)}
+                        disabled={processingAction?.id === threat.id}
+                        className="px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 rounded hover:bg-emerald-500/30 flex items-center gap-2 text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        {processingAction?.id === threat.id && processingAction.type === 'unblock' ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Unlock size={16} />
+                        )}
+                        {processingAction?.id === threat.id && processingAction.type === 'unblock' ? '正在解封...' : '解除封禁'}
+                      </button>
+                    )}
+
                     <button className="px-4 py-2 bg-cyber-800 text-slate-300 border border-cyber-700 rounded hover:bg-cyber-700 flex items-center gap-2 text-sm">
                       <Eye size={16} /> 关联溯源
                     </button>
@@ -288,6 +379,71 @@ const ThreatAlerts: React.FC = () => {
            </div>
          ))}
        </div>
+
+       {/* Blacklist Management Modal */}
+       {showBlacklist && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-cyber-900 border border-cyber-700 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                <div className="p-4 border-b border-cyber-700 flex items-center justify-between bg-cyber-800/50">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <ShieldX size={20} className="text-red-500" />
+                        防火墙黑名单管理
+                    </h3>
+                    <button onClick={() => setShowBlacklist(false)} className="text-slate-400 hover:text-white transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <div className="p-4 border-b border-cyber-700 bg-cyber-900/50">
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            placeholder="输入 IP 地址 (e.g. 192.168.1.100)" 
+                            className="flex-1 bg-cyber-950 border border-cyber-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                            value={newBlockIp}
+                            onChange={(e) => setNewBlockIp(e.target.value)}
+                        />
+                        <button 
+                            onClick={handleManualBlockSubmit}
+                            disabled={!newBlockIp}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-bold text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Plus size={16} /> 添加封禁
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                    {blacklistLoading ? (
+                        <div className="flex justify-center py-8 text-slate-500">
+                            <Loader2 size={24} className="animate-spin" />
+                        </div>
+                    ) : blockedIps.length === 0 ? (
+                        <div className="text-center py-8 text-slate-500 text-sm">
+                            暂无封禁 IP
+                        </div>
+                    ) : (
+                        blockedIps.map((ip, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-3 bg-cyber-800 rounded border border-cyber-700 hover:border-cyber-600 transition-colors">
+                                <span className="font-mono text-slate-200">{ip}</span>
+                                <button 
+                                    onClick={() => handleManualUnblockSubmit(ip)}
+                                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                    title="解除封禁"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+                
+                <div className="p-3 bg-cyber-800/30 border-t border-cyber-700 text-xs text-slate-500 text-center">
+                    共 {blockedIps.length} 个被封禁 IP
+                </div>
+            </div>
+        </div>
+       )}
     </div>
   );
 };

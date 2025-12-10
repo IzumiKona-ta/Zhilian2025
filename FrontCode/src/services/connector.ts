@@ -17,7 +17,11 @@ const ENDPOINTS = {
   
   // --- 威胁情报与处置接口 ---
   THREAT_BLOCK: (id: string) => `/threats/${id}/block`,     // 阻断攻击源 IP (POST)
+  THREAT_UNBLOCK: (id: string) => `/threats/${id}/unblock`, // 解封攻击源 IP (POST)
   THREAT_RESOLVE: (id: string) => `/threats/${id}/resolve`, // 标记事件已解决 (POST)
+  THREAT_BLOCKED_IPS: '/threats/blocked-ips',             // 获取当前被封禁的 IP 列表 (GET)
+  THREAT_MANUAL_BLOCK: '/threats/manual-block',           // 手动封禁 IP (POST)
+  THREAT_MANUAL_UNBLOCK: '/threats/manual-unblock',       // 手动解封 IP (POST)
   THREAT_HISTORY: '/analysis/alert',                        // 获取历史威胁记录 (GET)
 
   // --- 数据采集配置 ---
@@ -284,10 +288,31 @@ export const ThreatService = {
   blockIp: async (threatId: string): Promise<void> => {
     return api.post(ENDPOINTS.THREAT_BLOCK(threatId));
   },
+
+  // 下发 IP 解封指令
+  unblockIp: async (threatId: string): Promise<void> => {
+    return api.post(ENDPOINTS.THREAT_UNBLOCK(threatId));
+  },
   
   // 标记威胁为"误报"或"已解决"
   resolveThreat: async (threatId: string): Promise<void> => {
     return api.post(ENDPOINTS.THREAT_RESOLVE(threatId));
+  },
+
+  // 获取当前被封禁的 IP 列表
+  getBlockedIps: async (): Promise<string[]> => {
+    const response = await api.get(ENDPOINTS.THREAT_BLOCKED_IPS);
+    return response.data?.data || [];
+  },
+
+  // 手动封禁 IP
+  manualBlock: async (ip: string): Promise<void> => {
+    return api.post(ENDPOINTS.THREAT_MANUAL_BLOCK, null, { params: { ip } });
+  },
+
+  // 手动解封 IP
+  manualUnblock: async (ip: string): Promise<void> => {
+    return api.post(ENDPOINTS.THREAT_MANUAL_UNBLOCK, null, { params: { ip } });
   },
 
   // 获取历史数据

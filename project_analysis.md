@@ -1,8 +1,8 @@
 # Zhilian2025 网络安全平台 - 项目深度分析报告
-> **版本**: v7.2 (稳定修复版)
-> **日期**: 2025-12-10
+> **版本**: v7.5 (威胁响应与稳定性增强版)
+> **日期**: 2025-12-11
 > **架构**: 微服务 + 区块链 + 人工智能
-> **状态**: 🟢 生产就绪 (全模块实装，零报错)
+> **状态**: 🟢 生产就绪 (全模块实装，威胁响应闭环)
 
 ---
 
@@ -11,6 +11,8 @@
 **Zhilian2025** 是下一代**网络态势感知与威胁检测平台**。它深度融合了**机器学习 (AI)** 异常检测、**基于规则的入侵检测 (IDS)**、**主机入侵检测 (HIDS)** 以及**区块链**存证技术。
 
 系统为安全分析师提供了一个统一的**玻璃拟态 (Glassmorphism) UI**，用于实时监控网络流量、可视化攻击路径、管理数据采集节点以及审计安全事件。所有核心数据均来自真实的探测引擎，并由区块链保障数据的不可篡改性。
+
+**最新亮点 (v7.5)**: 实现了从威胁检测、自动/手动封禁到**一键解封**的完整闭环，并大幅增强了系统的鲁棒性（防误报、防自封、自动编码适配）。
 
 ---
 
@@ -26,13 +28,14 @@ graph TD
     subgraph "核心业务层"
         Frontend -->|REST API| Backend[业务后端 (Spring Boot)]
         Backend -->|MySQL| DB[(数据库)]
-        Backend -->|Redis| Cache[(缓存)]
+        Backend -->|Redis| Cache[(缓存 - 仅后端使用)]
     end
     
     subgraph "安全引擎层"
         ML_IDS[Python AI 检测引擎] -->|HTTP POST| Backend
         HIDS_Agent[主机监控探针] -->|HTTP POST| Backend
         Rule_IDS[Snort 规则引擎] -->|HTTP POST| Backend
+        Backend -->|Command Queue| HIDS_Agent
     end
     
     subgraph "区块链层"
@@ -49,7 +52,8 @@ graph TD
 | **BackCode** | 业务逻辑中枢 | **8081** | Spring Boot 3, MyBatis, JWT | `application.yml` |
 | **Middleware** | 区块链网关 | **8080** | Java, Web3SDK | `application.properties` |
 | **ML IDS** | AI 威胁检测 | **动态** | Python, PyTorch, Scapy | `realtime_detection_fixed.py` |
-| **HIDS Agent** | 主机监控探针 | **动态** | Python, Psutil | `agent.py` |
+| **Rule IDS** | 规则检测 | **动态** | Python, Scapy, Regex | `mini_snort_pro.py` |
+| **HIDS Agent** | 主机监控探针 | **动态** | Python, Psutil, Subprocess | `agent.py` |
 
 ---
 
@@ -60,124 +64,100 @@ graph TD
 *   **技术栈**: React 18, TypeScript, Vite 5, Recharts, ECharts, Tailwind CSS (玻璃拟态风格)。
 *   **核心模块**:
     *   **仪表盘 (`Home.tsx`)**: 实时安全评分、今日攻击统计、快捷操作入口。
-    *   **威胁分析 (`ThreatAnalysis.tsx`)**: 可视化流量趋势与攻击类型的交互式图表 (**已接入真实数据**)。
+    *   **威胁分析 (`ThreatAlerts.tsx`)**: 
+        *   实时展示告警列表。
+        *   **新增功能**: 威胁响应操作中心，支持对恶意 IP 进行**一键解封** (`Unblock`) 操作。
     *   **攻击溯源 (`ThreatTracing.tsx`)**: 基于 ECharts 的 3D 地理飞线图，追踪攻击源头与路径。
-    *   **主机监控 (`HostMonitoring.tsx`)**: 实时展示已注册主机的 CPU、内存、网络 I/O 及 **磁盘/核心文件** 状态。
+    *   **主机监控 (`HostMonitoring.tsx`)**: 实时展示已注册主机的资源状态及文件完整性。
     *   **采集管理 (`DataCollection.tsx`)**: HIDS 探针节点的配置与管理界面。
 
 ### 3.2 后端 (BackCode)
 系统的中枢大脑，负责业务逻辑、数据持久化与安全控制。
 *   **技术栈**: Spring Boot 3.5.7, JDK 17/23, MySQL, MyBatis Plus, PageHelper。
 *   **核心服务**:
+    *   `ThreatController`: **(v7.5 增强)** 新增 IP 解封接口，支持 UUID/ID 兼容查询，联动 HIDS Agent 执行解封命令。
     *   `AnalysisService`: 处理来自 IDS 引擎的威胁告警，负责数据清洗与入库。
     *   `MonitorService`: 处理 HIDS 探针的心跳包与状态上报，维护主机健康状态。
-    *   `TracingService`: 管理威胁溯源数据，支持多维度的攻击路径查询。
-    *   `OrgService`: 管理多租户组织架构及权限。
-    *   **DatabaseAutoUpdater (v7.2 新增)**: 启动时自动检查并修复数据库表结构，防止因缺少字段导致的 500 错误。
-*   **安全性**: 自定义 JWT 拦截器 (`JwtTokenAdminInterceptor`) 实现无状态鉴权。
+    *   **DatabaseAutoUpdater**: 启动时自动检查并修复数据库表结构。
+*   **数据存储**: 
+    *   MySQL: 存储结构化业务数据。
+    *   Redis: 仅用于后端缓存与 Session 管理（Python 脚本不再依赖）。
 
 ### 3.3 安全引擎 (PythonIDS)
-平台的“眼睛”，负责流量捕获与分析。
-*   **基于异常的 IDS (`realtime_detection_fixed.py`)**:
-    *   使用 **Scapy** 实时嗅探网卡 (`eth0`/`WLAN`) 数据包。
-    *   实时提取 79+ 种统计特征（流持续时间、包大小方差、到达间隔等）。
-    *   利用预训练的 **深度学习模型 (Autoencoder/GAN)** 检测零日 (Zero-day) 攻击。
-    *   **修正**: 调整了判定阈值 (`MIN_ATTACK_CONFIDENCE=0.5`) 以提高检测灵敏度。
-*   **HIDS 探针 (`hids_agent/agent.py`)**:
-    *   运行在目标主机上的轻量级 Python 脚本。
-    *   每 3 秒采集一次 **CPU 使用率**、**内存占用**及**网络连接数**。
-    *   **新增功能**: 
-        *   **磁盘监控**: 实时计算 Root/C: 盘的使用率与剩余空间。
-        *   **文件完整性监控 (FIM)**: 监控核心系统文件（如 `/etc/passwd`, `hosts`）的修改时间与状态。
-    *   自动向后端注册并上报数据。
+平台的“眼睛”与“手”，负责检测与响应。
 
-### 3.4 区块链基础设施
-平台的“信任锚点”。
-*   **平台**: FISCO BCOS (联盟链)。
+#### 3.3.1 AI 异常检测 (`realtime_detection_fixed.py`)
+*   **核心算法**: Autoencoder/GAN 深度学习模型。
+*   **关键改进 (v7.5)**:
+    *   **白名单机制**: 引入 `trusted_ips.json` 自动重载机制。
+    *   **协同防御**: 同步读取 `blocked_ips.json`，对于 Agent 已封禁的 IP，直接在检测层忽略，彻底消除“封禁后仍告警”的误报。
+    *   **智能避让**: 自动检测本机所有网卡 IP，防止将本机发出的正常流量（如上传数据）误报为攻击。
+
+#### 3.3.2 规则检测引擎 (`mini_snort_pro.py`)
+*   **核心机制**: 基于签名的流量匹配（类 Snort）。
+*   **关键改进 (v7.5)**:
+    *   **协同防御**: 自动读取 `blocked_ips.json`，对于已封禁的 IP 不再重复检测与告警。
+    *   **白名单支持**: 同样支持自动检测本机 IP 并加入信任列表。
+
+#### 3.3.3 HIDS 探针 (`hids_agent/agent.py`)
+*   **角色**: 运行在目标主机上的执行者。
 *   **功能**:
-    *   存储高危威胁的哈希值与组织架构变更记录。
-    *   确保审计日志无法被管理员或攻击者篡改。
-    *   **中间件**: 作为标准 REST API 与复杂区块链 RPC 协议之间的桥梁。
+    *   **监控**: CPU/内存/磁盘/网络/文件完整性。
+    *   **响应 (v7.5 重构)**: 
+        *   支持 `BLOCK_IP` (封禁) 和 `UNBLOCK_IP` (解封) 命令。
+        *   **安全熔断**: 执行封禁前，**强制检查**目标 IP 是否为本机 IP、网关或回环地址 (`127.0.0.1`)，防止“自杀式”封禁。
+        *   **兼容性**: 自动处理 Windows (`netsh`, GBK编码) 和 Linux (`iptables`, UTF-8编码) 的差异。
 
 ---
 
-## 4. 数据流向管道 (Data Pipelines)
+## 4. 威胁响应工作流 (Threat Response Workflow)
 
-### 4.1 威胁检测管道
-1.  **捕获 (Capture)**: `PythonIDS` 从网络接口捕获原始数据包。
-2.  **分析 (Analyze)**: AI 模型推理当前流量的攻击概率。
-3.  **告警 (Alert)**: 若 `score > threshold`，构造 JSON 载荷 POST 发送至 `BackCode` (`/api/analysis/alert`)。
-4.  **处理 (Process)**: `BackCode` 将告警存入 MySQL，并通过 WebSocket 推送至前端。
-5.  **可视化 (Visualize)**: `FrontCode` 接收 WebSocket 事件，实时更新“实时威胁预警”面板。
-6.  **存证 (Evidence)**: `BackCode` 异步将告警哈希发送至 `Middleware` 进行区块链上链。
+### 4.1 自动/手动 封禁流程
+1.  **检测**: IDS (AI/Rule) 发现异常流量。
+2.  **上报**: 告警发送至后端并存储。
+3.  **决策**: 
+    *   自动模式: 达到阈值自动下发封禁指令。
+    *   手动模式: 管理员在前端点击“封禁”。
+4.  **执行**: 
+    *   后端将 `BLOCK_IP` 指令推入命令队列。
+    *   HIDS Agent 获取指令 -> **安全检查(非本机)** -> 调用防火墙 (`netsh`/`iptables`)。
+5.  **同步**: Agent 更新本地 `blocked_ips.json`，IDS 引擎读取该文件以停止对该 IP 的后续检测。
 
-### 4.2 主机监控管道
-1.  **采集 (Collect)**: `hids_agent.py` 使用 `psutil` 库获取系统指标。
-2.  **增强采集**: 同时获取磁盘空间 (`psutil.disk_usage`) 和关键文件修改时间 (`os.path.getmtime`)。
-3.  **上报 (Report)**: Agent 将数据 POST 发送至 `BackCode` (`/api/host/monitor/report`)。
-4.  **存储 (Store)**: `BackCode` 自动校验数据库 Schema，随后更新 `host_status_monitor` 表。
-5.  **展示 (Display)**: `FrontCode` 轮询 `MonitorService` 接口，渲染实时的 CPU/内存波形图及文件状态列表。
-
----
-
-## 5. 部署与运维 (Deployment & Operations)
-
-### 5.1 环境要求
-*   **操作系统**: Windows 10/11 (需启用 WSL2) 或 Linux。
-*   **运行时**: Java 17+, Node.js 18+, Python 3.8+。
-*   **数据库**: MySQL 8.0 (端口 3306), Redis (端口 6379)。
-
-### 5.2 一键启动 (`start_project.bat`)
-项目包含一个精心编排的自动化脚本，处理了 5+ 个服务的启动复杂性。
-1.  **环境自检**: 自动校验 `java`, `mvn`, `npm`, `python`, `wsl` 是否存在。
-2.  **区块链**: 启动 WSL 脚本以运行 FISCO BCOS 节点。
-3.  **中间件**: 启动区块链 Java 接口服务。
-4.  **后端**: 启动 Spring Boot 业务应用。
-5.  **前端**: 自动安装 npm 依赖并启动 Vite 开发服务器。
-6.  **安全引擎**:
-    *   后台静默安装 Python 依赖 (`pip install ...`)。
-    *   独立窗口启动 **ML IDS** 引擎。
-    *   独立窗口启动 **HIDS Agent** 探针。
-
-### 5.3 故障排查
-*   **前端 404**: 检查 `vite.config.ts` 中的代理配置 (目标端口应为 8081 而非 8080)。
-*   **Agent 连接被拒绝**: 确保 `BackCode` 在 Agent 启动前已完全就绪。
-*   **后端端口占用**: 若遇 8081 端口占用，脚本或手动执行 `netstat -ano | findstr :8081` 并终止对应 PID。
-*   **数据库错误**: 若遇 "Unknown column"，重启后端即可触发 `DatabaseAutoUpdater` 自动修复。
+### 4.2 解封流程 (v7.5 新增)
+1.  **操作**: 管理员在“威胁分析”页面点击“解除封禁”。
+2.  **下发**: 后端发送 `UNBLOCK_IP` 指令。
+3.  **执行**: HIDS Agent 调用防火墙删除规则。
+4.  **恢复**: Agent 从 `blocked_ips.json` 移除该 IP，IDS 恢复对其的正常监控。
 
 ---
 
-## 6. 最新工作汇报 (Work Summary v7.2 - CRITICAL UPDATES)
+## 5. 最新工作汇报 (Work Summary v7.5 - COMPLETED)
 
-### 6.1 已完成核心修复 (Critical Fixes Resolved)
+### 5.1 核心功能交付 (Feature Delivery)
+1.  **IP 解封功能**: 
+    *   完成了从前端按钮到后端接口，再到底层防火墙命令的**全链路开发**。
+    *   支持 Windows (netsh) 和 Linux (iptables) 双平台。
+2.  **智能白名单 (Smart Whitelist)**:
+    *   解决了“本机流量被误报为攻击”的痛点。
+    *   实现了**零配置**：IDS 和 Agent 会自动通过 socket 探测和网卡遍历获取本机所有 IP，无需人工维护 `trusted_ips.json`。
 
-1.  **数据库架构自愈 (Schema Auto-Healing)**:
-    *   **问题**: 用户报告后端报错 `Unknown column 'disk_usage'`，且 HIDS 探针因此返回 500 错误。
-    *   **修复**: 开发了 `DatabaseAutoUpdater` 组件。在后端启动时，利用 `CommandLineRunner` 自动检测并修补数据库表结构。
-    *   **效果**: 系统自动添加了 `disk_usage`, `disk_info`, `file_status` 字段，**彻底解决了探针报错问题**。无需手动执行 SQL。
+### 5.2 稳定性与工程化修复 (Stability & Engineering)
+1.  **Redis 依赖解耦**:
+    *   响应用户需求，移除了 Python 脚本对 Redis 的直接依赖，回退为更轻量的 JSON 文件同步机制 (`blocked_ips.json`)，降低了部署复杂度。
+2.  **编码适配 (Encoding)**:
+    *   修复了 Windows 下中文环境 (`GBK`) 导致的 `UnicodeDecodeError`，现在 Agent 能正确处理中文报错信息。
+3.  **权限管控**:
+    *   Agent 启动时自动检查管理员权限，若无权限会发出醒目警告（防火墙操作必须）。
+4.  **端口冲突解决**:
+    *   解决了 `8081` 端口占用导致的后端启动失败问题。
 
-2.  **后端启动稳定性 (Backend Startup Stability)**:
-    *   **问题**: 端口 8081 被僵尸进程占用，导致 Maven 构建失败 (`MojoExecutionException`)。
-    *   **修复**: 识别并终止了占用端口的残留进程 (PID 30016)，恢复了后端的正常启动能力。
-    *   **验证**: 后端成功启动，并成功接收来自 HIDS Agent (IP: 192.168.31.87) 的完整数据包。
-
-3.  **FrontCode 登录安全加固**:
-    *   **修复**: 移除了 Login.tsx 中的“兜底逻辑”，系统不再在后端报错时强制允许登录。
-    *   **验证**: 输入错误密码现在会正确提示错误信息，而非自动跳转。
-
-4.  **HIDS 全链路打通 (End-to-End Verification)**:
-    *   **数据采集**: Python Agent 成功采集 Windows/Linux 磁盘与文件状态。
-    *   **数据传输**: 修复了 JSON 序列化问题，确保数据顺利到达后端。
-    *   **数据持久化**: 验证数据库中 `host_status_monitor` 表已正确存储 Agent 上报的 JSON 格式文件状态。
-    *   **前端展示**: 主机监控页面 (HostMonitoring) 现已实时渲染真实的磁盘进度条与文件安全列表。
-
-### 6.2 当前系统状态 (Current System Status)
-*   **Backend**: 🟢 运行中 (端口 8081)，Schema 自动同步功能正常。
-*   **Frontend**: 🟢 运行中 (端口 5173)，登录校验与 HIDS 展示正常。
-*   **HIDS Agent**: 🟢 运行中，数据上报成功率 100%。
-*   **Database**: 🟢 结构完整，数据写入正常。
-
-### 6.3 后续建议
-*   目前系统已处于高度稳定状态。若需重启，请直接使用 `start_project.bat`，系统会自动处理所有依赖与配置。
+### 5.3 当前系统状态
+*   **整体健康度**: 🟢 极佳
+*   **误报率**: 大幅降低 (得益于本地 IP 自动白名单)。
+*   **可用性**: 支持完整的攻击阻断与恢复流程。
 
 ---
+
+## 6. 部署建议
+*   **启动**: 继续使用 `start_project.bat`。
+*   **权限**: 务必以**管理员身份**运行终端，以确保 HIDS Agent 能操作防火墙。

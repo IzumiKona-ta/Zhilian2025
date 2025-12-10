@@ -2,6 +2,8 @@ import os
 import random
 import threading
 import time
+import json
+import socket
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
@@ -23,6 +25,75 @@ CAPTURE_MINUTES = 300000 / 60  # 30秒（30/60分钟）
 SHOW_ALL_PACKETS = False  # 只显示异常包
 SHOW_COLOR = True
 ENABLE_ANOMALY_SIMULATION = False
+
+# 信任的IP列表文件
+TRUSTED_IPS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../trusted_ips.json")
+# 已封禁的IP列表文件
+BLOCKED_IPS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../blocked_ips.json")
+
+trusted_ips = set()
+blocked_ips = set()
+last_trusted_ip_reload = 0
+last_blocked_ip_reload = 0
+
+def reload_blocked_ips():
+    """定期重新加载已封禁的IP列表"""
+    global blocked_ips, last_blocked_ip_reload
+    try:
+        if time.time() - last_blocked_ip_reload < 3:
+            return
+        
+        if os.path.exists(BLOCKED_IPS_FILE):
+            with open(BLOCKED_IPS_FILE, "r", encoding="utf-8") as f:
+                ips = json.load(f)
+                blocked_ips = set(ips)
+        else:
+            blocked_ips = set()
+            
+        last_blocked_ip_reload = time.time()
+    except Exception as e:
+        pass
+
+def reload_trusted_ips():
+    """定期重新加载信任的IP列表"""
+    global trusted_ips, last_trusted_ip_reload
+    try:
+        if time.time() - last_trusted_ip_reload < 3:
+            return
+        
+        # 1. Load from file
+        file_trusted_ips = set()
+        if os.path.exists(TRUSTED_IPS_FILE):
+            with open(TRUSTED_IPS_FILE, "r", encoding="utf-8") as f:
+                ips = json.load(f)
+                file_trusted_ips = set(ips)
+        
+        # 2. Auto-detect Local IPs
+        local_ips = set()
+        local_ips.add("127.0.0.1")
+        local_ips.add("::1")
+        try:
+            # Method 1: Hostname resolution
+            hostname = socket.gethostname()
+            for ip in socket.gethostbyname_ex(hostname)[2]:
+                local_ips.add(ip)
+        except:
+            pass
+        try:
+            # Method 2: Connect probe
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ips.add(s.getsockname()[0])
+            s.close()
+        except:
+            pass
+            
+        # Merge
+        trusted_ips = file_trusted_ips.union(local_ips)
+            
+        last_trusted_ip_reload = time.time()
+    except Exception as e:
+        pass
 
 # 判定灵敏度（可通过环境变量调整）
 # 【关键修复】降低阈值以提高检测敏感度：0.6仍然太高，0.5更合理（确保攻击流量能被检测到）
@@ -428,6 +499,18 @@ def packet_callback(packet):
 
     total_packets_captured += 1
     clean_timeout_flows()
+
+    # 0. 检查是否为信任IP（白名单）或已封禁IP
+    reload_trusted_ips()
+    reload_blocked_ips()
+    if packet.haslayer(IP):
+        src_ip = packet[IP].src
+        if src_ip in trusted_ips:
+            # 信任IP的流量，跳过检测
+            return
+        if src_ip in blocked_ips:
+            # 已封禁IP的流量，跳过检测（避免重复告警）
+            return
 
     # 1. 显示基础包信息
     if SHOW_ALL_PACKETS:

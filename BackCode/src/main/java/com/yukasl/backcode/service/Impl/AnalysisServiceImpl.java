@@ -69,6 +69,14 @@ public class AnalysisServiceImpl implements AnalysisService {
         return threatAlert;
     }
 
+    @Override
+    public potentialThreatAlert queryAlertByThreatId(String threatId) {
+        if (threatId == null) {
+            return null;
+        }
+        return analysisMapper.queryAlertByThreatId(threatId);
+    }
+
     /**
      * 保存并上链告警
      */

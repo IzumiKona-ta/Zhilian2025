@@ -45,4 +45,10 @@ public interface AnalysisMapper {
      */
     @Select("select id, threat_id, threat_level, impact_scope, occur_time, create_time from potential_threat_alert where id = #{id}")
     potentialThreatAlert queryAlertById(Integer id);
+
+    /**
+     * 根据 UUID 查询潜在威胁
+     */
+    @Select("select id, threat_id, threat_level, impact_scope, occur_time, create_time from potential_threat_alert where threat_id = #{threatId}")
+    potentialThreatAlert queryAlertByThreatId(String threatId);
 }

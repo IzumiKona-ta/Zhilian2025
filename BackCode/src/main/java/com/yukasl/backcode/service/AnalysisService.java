@@ -32,6 +32,11 @@ public interface AnalysisService {
     potentialThreatAlert queryAlertById(Integer id);
 
     /**
+     * 根据 UUID 查询详情
+     */
+    potentialThreatAlert queryAlertByThreatId(String threatId);
+
+    /**
      * 保存并上链告警
      */
     void saveAlert(potentialThreatAlert alert);
