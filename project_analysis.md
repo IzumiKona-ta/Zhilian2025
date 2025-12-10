@@ -51,8 +51,6 @@ graph TD
 | **ML IDS** | AI 威胁检测 | **动态** | Python, PyTorch, Scapy | `realtime_detection_fixed.py` |
 | **HIDS Agent** | 主机监控探针 | **动态** | Python, Psutil | `agent.py` |
 
-> **注意**: 后端端口已确认为 **8081**，避免与常见服务冲突。
-
 ---
 
 ## 3. 组件深度解析 (Detailed Component Analysis)
