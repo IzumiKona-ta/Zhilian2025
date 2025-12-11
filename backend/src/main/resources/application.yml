@@ -2,14 +2,17 @@ server:
   port: 8080
 
 fabric:
-  # ✅ 关键配置：直连 test-network 里的实时文件
-  networkConfigPath: ${user.home}/hyperledger/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/connection-org1.yaml
+  # ✅ 开发环境配置：使用相对路径指向 Zhilian_Install_Package 中的网络文件
+  # 注意：运行 mvn spring-boot:run 时，工作目录通常是 backend 文件夹
   
-  # ✅ 证书路径
-  certificatePath: ${user.home}/hyperledger/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/signcerts/User1@org1.example.com-cert.pem
+  # 连接配置文件
+  networkConfigPath: ../Zhilian_Install_Package/fabric-network/organizations/peerOrganizations/org1.example.com/connection-org1.yaml
   
-  # ✅ 私钥目录 (自动查找 _sk 文件)
-  privateKeyPath: ${user.home}/hyperledger/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/keystore/
+  # 用户证书
+  certificatePath: ../Zhilian_Install_Package/fabric-network/organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/signcerts/User1@org1.example.com-cert.pem
+  
+  # 私钥目录 (代码会自动查找该目录下的 _sk 文件)
+  privateKeyPath: ../Zhilian_Install_Package/fabric-network/organizations/peerOrganizations/org1.example.com/users/User1@org1.example.com/msp/keystore/
   
   mspid: Org1MSP
   username: User1

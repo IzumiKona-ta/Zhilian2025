@@ -30,19 +30,30 @@ public class FabricConfig {
 
     @Bean
     public Contract contract() throws Exception {
+        System.out.println("🚀 [FabricConfig] Initializing Fabric Gateway...");
+        System.out.println("   -> Config Path: " + networkConfigPath);
+        System.out.println("   -> Certificate Path: " + certificatePath);
+
         X509Certificate certificate = readX509Certificate(Paths.get(certificatePath));
         PrivateKey privateKey = getPrivateKey(Paths.get(privateKeyPath));
 
         Wallet wallet = Wallets.newInMemoryWallet();
         wallet.put(username, Identities.newX509Identity(mspid, certificate, privateKey));
 
+        // 显式设置系统属性，强制启用 localhost 转换 (即使禁用了 discovery，这也可以作为双重保险)
+        System.setProperty("org.hyperledger.fabric.sdk.service_discovery.as_localhost", "true");
+
         Gateway.Builder builder = Gateway.createBuilder()
                 .identity(wallet, username)
                 .networkConfig(Paths.get(networkConfigPath))
-                .discovery(true);
+                .discovery(false); // 明确禁用服务发现
 
         Gateway gateway = builder.connect();
+        System.out.println("✅ [FabricConfig] Gateway connected successfully!");
+        
         Network network = gateway.getNetwork(channelName);
+        System.out.println("✅ [FabricConfig] Network channel retrieved: " + channelName);
+
         return network.getContract(contractName);
     }
 
@@ -53,10 +64,18 @@ public class FabricConfig {
     }
 
     private static PrivateKey getPrivateKey(final Path privateKeyPath) throws IOException, InvalidKeyException {
-        try (Stream<Path> walk = Files.walk(privateKeyPath.getParent())) {
+        // 如果传入的是目录，则在目录中查找
+        Path searchDir = privateKeyPath;
+        if (!Files.isDirectory(privateKeyPath)) {
+             searchDir = privateKeyPath.getParent();
+        }
+        
+        final Path finalSearchDir = searchDir; // 必须是 effectively final 才能在 lambda 中使用
+
+        try (Stream<Path> walk = Files.walk(finalSearchDir)) {
             Path keyFile = walk.filter(p -> p.toString().endsWith("_sk") || p.toString().contains("priv_sk"))
                     .findFirst()
-                    .orElseThrow(() -> new IOException("No private key found in " + privateKeyPath));
+                    .orElseThrow(() -> new IOException("No private key found in " + finalSearchDir));
             try (Reader privateKeyReader = Files.newBufferedReader(keyFile, StandardCharsets.UTF_8)) {
                 return Identities.readPrivateKey(privateKeyReader);
             }

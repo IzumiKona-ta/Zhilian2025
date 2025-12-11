@@ -1,43 +1,42 @@
-# Zhilian2025 网络安全平台 - 项目深度分析报告
-> **版本**: v7.7 (TransecGAN 模型修正与架构深度复盘版)
-> **日期**: 2025-12-11
-> **架构**: 微服务 (Spring Boot) + 区块链 (FISCO BCOS) + 人工智能 (PyTorch)
-> **状态**: 🟢 生产就绪 (全功能实装，闭环防御体系)
+# Zhilian2025 网络安全态势感知与主动防御平台
+
+> **版本**: v1.2.0 (TransecGAN + Hyperledger Fabric 深度融合版)  
+> **状态**: 🟢 生产就绪 (Production Ready)  
+> **文档日期**: 2025-12-11  
+> **核心架构**: Spring Boot 微服务 + React 可视化 + TransecGAN 深度学习 + Hyperledger Fabric 区块链
 
 ---
 
 ## 1. 项目概述 (Executive Summary)
 
-**Zhilian2025** 是一款企业级**网络态势感知与主动防御平台**。它突破了传统 IDS 仅能“旁路告警”的局限，构建了从**流量感知**到**AI 研判**，再到**端点阻断**的完整闭环。
+**Zhilian2025** 是一款企业级下一代网络安全平台，致力于解决传统入侵检测系统 (IDS) 仅能“旁路告警”无法“实时阻断”的痛点。本项目构建了从**全流量感知**到**AI 智能研判**，再到**端点主动防御**与**区块链存证**的完整闭环体系。
 
-系统深度融合了以下核心技术：
-*   **AI 深度学习**: 采用先进的 **TransecGAN (Transformer-Encoder GAN)** 模型，利用 Transformer 的长序列建模能力与 GAN 的对抗生成特性，精准检测零日 (Zero-day) 未知威胁。
-*   **端点防御 (EDR)**: HIDS 探针不仅采集数据，更能执行防火墙策略，实现毫秒级威胁封禁。
-*   **区块链存证**: 关键告警上链存储，确保数据不可篡改，满足等保审计要求。
-*   **可视化指挥**: 玻璃拟态风格的态势大屏，提供上帝视角的网络监控能力。
-
-**核心价值**: 变“被动防御”为“主动响应”，实现对网络攻击的秒级发现与自动/手动阻断。
+### 1.1 核心价值
+*   **零日威胁免疫**: 摒弃传统基于特征库的检测模式，采用 **TransecGAN** (Transformer-Encoder GAN) 模型，有效识别未知 Zero-day 攻击。
+*   **主动防御 (Active Response)**: HIDS 探针不仅仅是监控器，更是执行器。它能联动系统防火墙 (Windows Firewall/Iptables) 实现毫秒级自动封禁。
+*   **司法级存证**: 引入 **Hyperledger Fabric** 联盟链，将关键威胁告警实时上链，确保数据不可篡改，满足等保 2.0 对安全审计的严苛要求。
+*   **全景态势感知**: 玻璃拟态风格的 3D 可视化大屏，提供上帝视角的网络健康度监控与攻击溯源。
 
 ---
 
 ## 2. 系统架构 (System Architecture)
 
-平台采用**分布式微服务架构**，各组件松耦合，通过标准 REST API 和 WebSocket 进行通信。
+平台采用**端-边-云**协同的分布式架构，各组件通过标准 REST API、WebSocket 和 gRPC 进行高保真通信。
 
 ### 2.1 逻辑拓扑图
 ```mermaid
 graph TD
-    User[安全分析师] -->|HTTPS| Frontend[前端指挥大屏 (React/Vite)]
+    User[安全分析师] -->|HTTPS| Frontend[前端指挥舱 (React/Vite)]
     
     subgraph "业务中台 (Business Layer)"
         Frontend -->|REST API| Backend[业务后端 (Spring Boot)]
         Backend -->|WebSocket| Frontend
         Backend -->|MySQL| DB[(业务数据库)]
-        Backend -->|Redis| Cache[(会话缓存)]
+        Backend -->|Redis| Cache[(指令队列缓存)]
     end
     
     subgraph "感知与响应层 (Sensor & Response Layer)"
-        ML_IDS[Python AI 检测引擎] -->|HTTP POST| Backend
+        ML_IDS[Python AI 引擎 (TransecGAN)] -->|HTTP POST| Backend
         Rule_IDS[Snort 规则引擎] -->|HTTP POST| Backend
         HIDS_Agent[HIDS 主机探针] -->|HTTP POST (心跳)| Backend
         Backend -->|Command Queue| HIDS_Agent
@@ -45,139 +44,163 @@ graph TD
     end
     
     subgraph "信任锚点 (Trust Layer)"
-        Backend -->|REST API| Middleware[区块链中间件]
-        Middleware -->|SDK| Chain[FISCO BCOS 联盟链]
+        Backend -->|Fabric Gateway SDK| Peer[Fabric Peer 节点]
+        Peer -->|gRPC| Orderer[Ordering Service]
+        Peer -->|Ledger| CouchDB[(世界状态库)]
     end
 ```
 
-### 2.2 核心服务端口映射
-| 服务组件 | 关键职责 | 端口 | 技术栈 | 配置文件 |
-| :--- | :--- | :--- | :--- | :--- |
-| **FrontCode** | 用户交互、数据可视化 | **5173** | React 18, Vite, Tailwind | `vite.config.ts` |
-| **BackCode** | 业务逻辑、指令调度 | **8081** | Spring Boot 3, MyBatis | `application.yml` |
-| **Middleware** | 区块链交互网关 | **8080** | Java Spring Boot | `application.properties` |
-| **ML IDS** | 异常流量检测 (AI) | N/A | **Python, PyTorch (TransecGAN)** | `realtime_detection_fixed.py` |
-| **HIDS Agent** | 主机监控、命令执行 | N/A | Python, Psutil | `agent.py` |
+### 2.2 技术栈概览 (Tech Stack)
+| 模块 | 技术组件 | 版本 | 说明 |
+| :--- | :--- | :--- | :--- |
+| **后端 (Backend)** | Java, Spring Boot | 2.7.x / JDK 17 | 核心业务逻辑，集成 Fabric SDK |
+| **前端 (Frontend)** | React, TypeScript, Vite | 18.x | 现代化 SPA，集成 ECharts/Recharts |
+| **人工智能 (AI)** | Python, PyTorch | 3.8+ | TransecGAN 模型训练与推理 |
+| **区块链 (Blockchain)** | Hyperledger Fabric | 2.4 | 联盟链架构，Docker 容器化部署 |
+| **智能合约 (Chaincode)** | Java | 1.0 | 存证合约 `EvidenceContract` |
+| **端点 (Agent)** | Python, Psutil | 3.8+ | 跨平台主机监控与命令执行 |
 
 ---
 
 ## 3. 组件深度解析 (Detailed Component Analysis)
 
-### 3.1 感知与响应层 (PythonIDS) - 核心引擎
-分布式的安全触手，负责“看”和“动”。
+### 3.1 感知层：TransecGAN 异常检测引擎
+位于 `PythonIDS/anomaly_based_ids/`，是系统的“眼睛”。
 
-#### 3.3.1 AI 异常检测引擎 (`realtime_detection_fixed.py`)
-*   **核心模型**: **TransecGAN (Transformer-Encoder GAN)**
-    *   **架构原理**: 
-        *   **生成器 (Generator)**: 使用 Transformer Encoder 结构，学习正常流量的时序模式，试图“重构”或“生成”正常流量特征。
-        *   **判别器 (Discriminator)**: 同样基于 Transformer Encoder，负责区分真实流量与生成流量，并进行多分类（攻击类型识别）。
-        *   **优势**: 相比传统 Autoencoder，Transformer 能更好地捕捉流量包之间的长距离依赖关系 (Long-term Dependencies)，显著降低误报率。
-*   **检测流程**: 
-    1.  使用 Scapy 捕获原始流量。
-    2.  提取 **79 维**统计特征 (CICIDS2017 标准)。
-    3.  输入 **TransecGAN** 模型进行推理。
-    4.  综合 **重构误差 (Reconstruction Error)** 和 **判别器置信度**，判定是否为异常。
+*   **模型架构**: **TransecGAN (Transformer-Encoder GAN)**
+    *   **生成器 (Generator)**: 采用 Transformer Encoder 结构，利用 Self-Attention 机制捕捉流量包序列的长距离依赖关系，学习正常流量的时序分布。
+    *   **判别器 (Discriminator)**: 同样基于 Transformer，负责区分真实流量与生成流量，并计算异常分数。
+    *   **优势**: 相比传统 LSTM/Autoencoder，TransecGAN 在处理高并发、长序列流量数据时具有更高的准确率和更低的误报率。
+*   **特征工程**: 基于 **CICFlowMeter** 提取 79 维统计特征（如流持续时间、包长方差、标志位计数等），完全兼容 CICIDS2017 数据集标准。
 *   **智能特性**:
-    *   **自动白名单**: 启动时自动探测本机所有网卡 IP (包括虚拟网卡)，加入信任列表，防止将本机外发流量误报为攻击。
-    *   **协同防御**: 实时读取 `blocked_ips.json`，对于已封禁 IP 自动停止检测，节省算力并消除重复告警。
+    *   **自适应白名单**: 启动时自动扫描本机网卡 IP，防止将出站流量误报为攻击。
+    *   **协同过滤**: 实时读取 `blocked_ips.json`，自动忽略已封禁 IP 的流量，节省计算资源。
 
-#### 3.3.2 HIDS 主机探针 (`hids_agent/agent.py`)
-*   **职责**: 驻留在目标主机，负责监控与执行。
-*   **监控能力**: 
-    *   系统资源: CPU, 内存, 磁盘 (Root/C:), 网络连接数。
-    *   文件完整性 (FIM): 监控 `/etc/passwd`, `hosts`, `C:\Windows\System32\drivers\etc\hosts` 等关键文件。
-*   **响应能力 (Active Response)**:
-    *   **跨平台防火墙**: 
-        *   **Windows**: 调用 `netsh advfirewall firewall` 添加/删除入站规则。
-        *   **Linux**: 调用 `iptables -I INPUT` 添加/删除丢弃规则。
-    *   **安全熔断机制 (Safety Circuit)**: 在执行 `BLOCK_IP` 前，强制调用 `get_all_local_ips()` 检查目标 IP 是否为本机、网关或回环地址。**坚决防止“自杀式”封禁导致系统失联。**
-    *   **编码自适应**: 自动处理 Windows GBK 和 Linux UTF-8 编码，彻底解决 `UnicodeDecodeError`。
+### 3.2 响应层：HIDS 主机探针
+位于 `PythonIDS/hids_agent/`，是系统的“手臂”。
 
-### 3.2 前端交互层 (FrontCode)
-基于 React 18 构建的现代化 SPA，实现了极佳的交互体验。
-*   **技术栈**: React, TypeScript, Vite, Recharts, ECharts, Lucide Icons, Axios。
-*   **关键模块**:
-    *   **实时威胁预警 (`ThreatAlerts.tsx`)**: 
-        *   **核心功能**: 实时展示 IDS 告警流。
-        *   **v7.6 更新**: 集成**防火墙黑名单管理面板**。支持查看当前封禁 IP 列表、手动添加封禁 IP、一键解封。
-    *   **攻击溯源 (`ThreatTracing.tsx`)**: 3D 地球飞线图，展示攻击源地理位置。
-    *   **主机监控 (`HostMonitoring.tsx`)**: 实时渲染 HIDS 上报的 CPU/内存/磁盘波形图。
-    *   **服务通信 (`connector.ts`)**: 封装了所有后端 API 调用，新增 `getBlockedIps`, `manualBlock`, `manualUnblock` 等防火墙管理接口。
+*   **双向通信**: 采用**心跳轮询 (Heartbeat)** 机制（默认 3-5秒）向后端上报状态，并拉取待执行指令。
+*   **主动防御能力**:
+    *   **Windows**: 调用 `netsh advfirewall firewall` 动态添加入站拦截规则。
+    *   **Linux**: 调用 `iptables -I INPUT -j DROP` 插入高优先级丢弃规则。
+*   **安全熔断机制 (Safety Circuit)**:
+    *   在执行 `BLOCK_IP` 前，强制检查目标 IP 是否为本机 IP、网关或 `127.0.0.1`。
+    *   **坚决防止“自杀式”封禁**导致管理员失去对服务器的控制权。
 
-### 3.3 业务逻辑层 (BackCode)
-系统的中枢神经，负责数据流转与决策下发。
-*   **技术栈**: Spring Boot 3.5.7, JDK 17, MySQL 8.0。
-*   **核心控制器**:
-    *   **`ThreatController`**: 
-        *   处理威胁相关的业务逻辑。
-        *   **v7.6 增强**: 新增防火墙管理 API，支持通过 UUID 或 ID 查询威胁并下发指令。
-    *   **`MonitorController`**: 
-        *   接收 HIDS 心跳包 (`/api/host/monitor/report`)。
-        *   **v7.6 增强**: 实现了**指令通道回退机制**。当 Agent 自身 IP 的指令队列为空时，自动检查 `127.0.0.1` 默认通道，确保局域网/NAT 环境下的指令必达。
-*   **核心服务**:
-    *   **`CommandQueueService`**: 基于内存的指令队列，暂存待下发给 HIDS 的 `BLOCK_IP` / `UNBLOCK_IP` 指令。
-    *   **`DatabaseAutoUpdater`**: 启动时自动扫描并修复数据库表结构，确保 `disk_usage` 等新字段存在，防止 500 错误。
+### 3.3 信任层：Hyperledger Fabric 联盟链
+位于 `Zhilian_Install_Package/fabric-network/`，是系统的“黑匣子”。
+
+*   **网络拓扑**:
+    *   **Org1**: 单组织架构，包含 1 个 Peer 节点 (Peer0) 和 1 个 CA 节点。
+    *   **Orderer**: Raft 共识排序节点，确保交易顺序一致性。
+    *   **CouchDB**: 作为状态数据库，支持富查询 (Rich Query)。
+*   **链码 (Smart Contract)**:
+    *   **语言**: Java
+    *   **功能**: 定义了 `Evidence` 资产，包含 `threatId`, `sourceIp`, `timestamp`, `signature` 等字段。
+    *   **背书策略**: 默认 `AND('Org1MSP.member')`，确保每笔存证都经过组织签名。
 
 ---
 
 ## 4. 关键业务流程 (Key Workflows)
 
 ### 4.1 全生命周期威胁封禁 (Full Lifecycle Blocking)
-1.  **检测**: TransecGAN 模型或规则引擎发现恶意 IP `1.2.3.4`。
-2.  **上报**: 告警数据 POST 至后端，前端大屏弹出红色警报。
-3.  **指令生成**: 
-    *   **自动**: 若配置了自动响应，后端直接生成 `BLOCK_IP 1.2.3.4`。
-    *   **手动**: 管理员在前端点击“封禁”，后端生成指令。
-4.  **指令下发**: 指令被推入 `CommandQueue`。
-5.  **执行**: 
-    *   HIDS Agent 发送心跳包。
-    *   后端在响应中携带指令。
-    *   Agent 收到指令 -> **安全检查** -> **执行系统命令** -> **更新本地 blocked_ips.json**。
-6.  **闭环**: IDS 引擎读取 `blocked_ips.json`，停止对该 IP 的告警。
+1.  **检测**: TransecGAN 模型从实时流量中识别出恶意 IP `X.X.X.X`。
+2.  **上报**: 告警数据通过 REST API 推送至后端 `ThreatController`。
+3.  **存证**: 后端异步调用 Fabric SDK，将告警哈希值与元数据上链，生成唯一交易 ID (TxID)。
+4.  **决策**:
+    *   **自动模式**: 系统直接生成 `BLOCK_IP` 指令。
+    *   **手动模式**: 待管理员在前端点击“封禁”按钮。
+5.  **下发**: 指令进入 Redis/内存队列 `CommandQueue`。
+6.  **执行**: HIDS Agent 心跳拉取指令 -> 执行防火墙命令 -> 更新本地 `blocked_ips.json`。
+7.  **闭环**: 流量被网卡层丢弃，攻击彻底终止。
 
-### 4.2 一键解封与黑名单管理 (Unblock & Management)
-1.  **管理**: 管理员打开前端“防火墙黑名单”面板。
-2.  **操作**: 点击“删除”图标或手动输入 IP 添加。
-3.  **流转**: 前端调用 `/manual-unblock` -> 后端推入指令队列 -> Agent 获取指令。
-4.  **恢复**: Agent 调用防火墙删除规则 -> 移除本地 JSON 记录 -> 流量恢复。
+### 4.2 黑名单管理与误报回滚
+1.  **查看**: 前端“防火墙状态”面板实时展示当前所有被封禁 IP。
+2.  **解封**: 管理员点击“解封”图标 -> 后端生成 `UNBLOCK_IP` 指令。
+3.  **恢复**: Agent 收到指令 -> 删除防火墙规则 -> 流量恢复正常。
 
 ---
 
-## 5. 部署与运维指南 (Deployment & Operations)
+## 5. 安装与部署指南 (Installation Guide)
 
-### 5.1 环境依赖
-*   **OS**: Windows 10/11 (推荐) 或 Linux。
-*   **Runtime**: Java 17+, Python 3.8+, Node.js 18+。
-*   **Middleware**: MySQL 8.0, Redis (可选)。
+本项目提供两种部署模式：**生产环境交付模式 (Pack-and-Go)** 和 **开发调试模式**。
 
-### 5.2 启动方式
-使用项目根目录下的 **`start_project.bat`** 脚本。
-> **v7.6 脚本优化**:
-> *   **目录修正**: 强制使用 `cd /d "%~dp0"` 确保所有子进程在项目根目录运行，解决“找不到文件”错误。
-> *   **权限提升**: HIDS Agent 自动请求管理员权限启动，确保有权操作防火墙。
+### 5.1 生产环境部署 (推荐)
+适用于最终交付，无需安装 Java/Maven 环境，仅需 Docker。
 
-### 5.3 常见问题排查
-*   **Q: 为什么手动封禁后没有立即生效？**
-    *   A: HIDS Agent 是轮询机制 (默认 3-5秒)，指令会在下一次心跳时被获取执行。
-*   **Q: 启动脚本报错 "Python not found"?**
-    *   A: 请确保 Python 已加入系统环境变量 PATH。
-*   **Q: 8081 端口被占用？**
-    *   A: 脚本会自动尝试清理，若失败请手动运行 `netstat -ano | findstr :8081` 并杀掉对应进程。
+1.  **进入安装包**:
+    ```bash
+    cd Zhilian_Install_Package
+    ```
+2.  **一键启动**:
+    ```bash
+    # Linux/WSL/Git Bash
+    ./install.sh
+    ```
+    *脚本会自动清理旧容器、启动 Fabric 网络、部署链码、生成证书，并启动内置的后端 JAR 包。*
+3.  **验证**:
+    *   后端接口: `http://localhost:8080/api/health`
+    *   区块链浏览器: `http://localhost:5984/_utils` (CouchDB)
+
+### 5.2 开发调试模式 (Hybrid Mode)
+适用于开发者需要修改后端代码，同时复用 Docker 中的区块链网络。
+
+1.  **启动基础设施**: 仅运行区块链网络，不启动内置后端。
+    ```bash
+    cd Zhilian_Install_Package
+    ./start_backend_only.sh  # 实际上这个脚本主要用于辅助重启，建议先用 install.sh 跑通一次网络
+    ```
+2.  **配置后端**:
+    修改 `backend/src/main/resources/application.yml`，确保 `networkConfigPath` 等路径指向 `../Zhilian_Install_Package/...` (v1.2.0 已默认配置相对路径)。
+3.  **启动后端**:
+    ```bash
+    cd backend
+    mvn spring-boot:run
+    ```
+    *注意：后端已禁用 gRPC 服务发现 (`discovery: false`)，以解决本地开发时的 Docker NAT 问题。*
 
 ---
 
-## 6. 版本更新记录 (Changelog - v7.7)
+## 6. 前端使用手册 (User Manual)
 
-### ✨ 修正与增强
-1.  **AI 模型修正**: 修正了文档中关于 AI 模型的描述，明确为 **TransecGAN (Transformer-Encoder GAN)**，而非普通的 Autoencoder。
-2.  **前端防火墙管理面板**: 实现了可视化的黑名单增删改查，不再依赖命令行。
-3.  **手动黑/白名单接口**: 后端新增 `/api/threats/manual-block` 等接口，支持任意 IP 的管控。
+### 6.1 实时威胁大屏 (Home)
+*   **流量波形**: 实时展示网络吞吐量。
+*   **威胁地图**: 3D 地球展示攻击源地理分布。
+*   **实时告警流**: 滚动显示最新的威胁检测日志。
 
-### 🛠️ 核心修复 (Critical Fixes)
-1.  **指令通道回退 (Command Fallback)**: 修复了 Agent 使用局域网 IP (如 `192.168.x.x`) 注册时无法收到默认发给 `127.0.0.1` 指令的问题。
-2.  **启动路径修正**: 修复了 `start_project.bat` 在管理员模式下工作目录漂移到 `System32` 的问题。
-3.  **智能白名单 (Smart Whitelist)**: IDS 和 Agent 现已支持自动识别本机所有 IP，彻底解决了本机流量误报问题。
-4.  **编码健壮性**: Agent 增加了对子进程输出的编码容错处理，消除了中文环境下的崩溃风险。
+### 6.2 防火墙管理 (Firewall Panel)
+*   **入口**: 点击大屏右上角或侧边栏的“防火墙状态”。
+*   **功能**:
+    *   **列表**: 查看 IP、封禁时间、封禁原因。
+    *   **搜索**: 支持按 IP 模糊搜索。
+    *   **手动封禁**: 输入 IP 和理由，强制下发封禁指令。
+    *   **一键解封**: 撤销指定 IP 的封禁规则。
 
 ---
-> **总结**: v7.7 版本标志着 Zhilian2025 从一个“监控平台”进化为一个具备完整**感知 (TransecGAN)-决策-响应**能力的**主动防御系统**。
+
+## 7. 常见问题 (FAQ)
+
+### Q1: 启动脚本提示 "Peer binary not found"?
+**A**: 这是因为 `install.sh` 依赖 Fabric 二进制文件。请确保 `Zhilian_Install_Package/bin` 目录存在且具有执行权限。v1.2.0 安装包已内置这些文件。
+
+### Q2: 后端报错 "ServiceDiscoveryException"?
+**A**: 这是由于 Docker 容器内的主机名无法在宿主机解析。我们已在代码中通过 `gateway.discovery(false)` 禁用了服务发现，并配置了 `localhost` 映射。请确保使用最新的 `backend` 代码。
+
+### Q3: WSL 下运行内存溢出 (OOM)?
+**A**: Hyperledger Fabric 组件较为耗费内存。建议在 `.wslconfig` 中将 WSL2 的内存限制调整为 4GB 或以上。
+
+### Q4: 为什么手动封禁后 Ping 还能通？
+**A**: 
+1. 检查 HIDS Agent 是否运行 (`python agent.py`)。
+2. 检查 Agent 日志是否有 `[SUCCESS] Blocked IP ...`。
+3. Windows 防火墙规则可能有延迟，或存在更高优先级的允许规则。
+
+---
+
+## 8. 联系方式与许可证
+
+*   **许可证**: MIT License
+*   **维护团队**: Zhilian Security Team
+*   **反馈邮箱**: support@zhilian.com
+
+*Copyright © 2025 Zhilian Security. All Rights Reserved.*
