@@ -88,4 +88,12 @@ public class AnalysisController {
 
         return Result.success("Alert received and processed");
     }
+
+    /**
+     * 获取攻击趋势统计 (24h/7d/30d)
+     */
+    @GetMapping("/trend")
+    public Result<java.util.List<java.util.Map<String, Object>>> getTrendStats(@RequestParam(defaultValue = "24h") String range) {
+        return Result.success(analysisService.getTrendStats(range));
+    }
 }

@@ -96,7 +96,7 @@ timeout /t 5 /nobreak >nul
 echo [2/5] Launching Blockchain Middleware...
 echo       - Connects to FISCO BCOS
 echo       - Provides REST API for Chain Data
-start "Blockchain Middleware" /min /D "%~dp0\backend" wsl bash -c "mvn spring-boot:run; echo 'Middleware stopped. Press Enter to exit...'; read"
+start "Blockchain Middleware" /min /D "%~dp0\backend" cmd /k "mvn spring-boot:run; echo 'Middleware stopped. Press Enter to exit...'; read"
 
 :: ==============================================================================
 :: 3. Start Business Backend (Java Spring Boot)

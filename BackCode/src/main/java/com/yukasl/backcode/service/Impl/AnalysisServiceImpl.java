@@ -104,4 +104,22 @@ public class AnalysisServiceImpl implements AnalysisService {
             e.printStackTrace();
         }
     }
+
+    @Override
+    public List<java.util.Map<String, Object>> getTrendStats(String timeRange) {
+        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime startTime;
+
+        if ("7d".equals(timeRange)) {
+            startTime = endTime.minusDays(7);
+            return analysisMapper.countAlertsByDay(startTime, endTime);
+        } else if ("30d".equals(timeRange)) {
+            startTime = endTime.minusDays(30);
+            return analysisMapper.countAlertsByDay(startTime, endTime);
+        } else {
+            // Default 24h
+            startTime = endTime.minusHours(24);
+            return analysisMapper.countAlertsByHour(startTime, endTime);
+        }
+    }
 }

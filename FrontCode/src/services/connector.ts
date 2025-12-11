@@ -161,6 +161,12 @@ export const AnalysisService = {
       params: { pageNum, pageSize }
     });
     return response.data?.data?.records || response.data?.data || [];
+  },
+
+  // 新增趋势统计接口
+  getTrend: async (range: string = '24h') => {
+    const response = await api.get('/analysis/trend', { params: { range } });
+    return response.data?.data || [];
   }
 };
 
@@ -377,6 +383,33 @@ export const ThreatService = {
         console.error("Failed to fetch history:", error);
         return [];
     }
+  }
+};
+
+/**
+ * AI 智能报告服务
+ */
+export const ReportService = {
+  // 调用后端生成 AI 报告
+  generate: async (type: string): Promise<string> => {
+    const response = await api.post('/report/generate', { type });
+    return response.data?.data;
+  },
+  
+  // 获取历史报告
+  getHistory: async () => {
+    const response = await api.get('/report/history');
+    return response.data?.data || [];
+  },
+
+  // 删除历史报告
+  delete: async (id: number) => {
+    return api.delete(`/report/history/${id}`);
+  },
+
+  // 重命名历史报告
+  rename: async (id: number, newTitle: string) => {
+    return api.put(`/report/history/${id}`, { title: newTitle });
   }
 };
 

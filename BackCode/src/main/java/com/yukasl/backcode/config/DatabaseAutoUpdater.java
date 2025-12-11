@@ -27,9 +27,27 @@ public class DatabaseAutoUpdater implements CommandLineRunner {
         updateTable("host_status_monitor", "disk_info", "ALTER TABLE host_status_monitor ADD COLUMN disk_info varchar(255) NULL COMMENT '磁盘详情'");
         updateTable("host_status_monitor", "file_status", "ALTER TABLE host_status_monitor ADD COLUMN file_status text NULL COMMENT '核心文件状态(JSON)'");
         
+        // Ensure report history table exists
+        createTable("threat_report_history", "CREATE TABLE IF NOT EXISTS threat_report_history (" +
+                "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                "title VARCHAR(255) NOT NULL, " +
+                "report_type VARCHAR(50) NOT NULL, " +
+                "content LONGTEXT, " +
+                "create_time DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         log.info("=============================================");
         log.info("       Database Schema Check Completed       ");
         log.info("=============================================");
+    }
+
+    private void createTable(String tableName, String sql) {
+        try {
+            jdbcTemplate.execute(sql);
+            log.info("[SUCCESS] Created/Checked table '{}'", tableName);
+        } catch (Exception e) {
+             log.warn("[WARNING] Failed to create table '{}': {}", tableName, e.getMessage());
+        }
     }
 
     private void updateTable(String tableName, String columnName, String sql) {

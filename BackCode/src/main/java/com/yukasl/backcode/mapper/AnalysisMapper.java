@@ -51,4 +51,26 @@ public interface AnalysisMapper {
      */
     @Select("select id, threat_id, threat_level, impact_scope, occur_time, create_time from potential_threat_alert where threat_id = #{threatId}")
     potentialThreatAlert queryAlertByThreatId(String threatId);
+
+    /**
+     * 按时间范围统计攻击趋势 (按小时聚合)
+     */
+    @Select("SELECT DATE_FORMAT(occur_time, '%Y-%m-%d %H:00:00') as time_bucket, COUNT(*) as count " +
+            "FROM potential_threat_alert " +
+            "WHERE occur_time >= #{startTime} AND occur_time <= #{endTime} " +
+            "GROUP BY time_bucket " +
+            "ORDER BY time_bucket")
+    List<java.util.Map<String, Object>> countAlertsByHour(@org.apache.ibatis.annotations.Param("startTime") java.time.LocalDateTime startTime, 
+                                                          @org.apache.ibatis.annotations.Param("endTime") java.time.LocalDateTime endTime);
+
+    /**
+     * 按时间范围统计攻击趋势 (按天聚合)
+     */
+    @Select("SELECT DATE_FORMAT(occur_time, '%Y-%m-%d') as time_bucket, COUNT(*) as count " +
+            "FROM potential_threat_alert " +
+            "WHERE occur_time >= #{startTime} AND occur_time <= #{endTime} " +
+            "GROUP BY time_bucket " +
+            "ORDER BY time_bucket")
+    List<java.util.Map<String, Object>> countAlertsByDay(@org.apache.ibatis.annotations.Param("startTime") java.time.LocalDateTime startTime, 
+                                                         @org.apache.ibatis.annotations.Param("endTime") java.time.LocalDateTime endTime);
 }

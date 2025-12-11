@@ -10,13 +10,18 @@
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
+    "@tailwindcss/typography": "^0.5.19",
     "axios": "^1.6.2",
     "echarts": "^5.5.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.4",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.22.3",
     "recharts": "^2.12.2",
+    "remark-gfm": "^4.0.1",
     "ws": "^8.18.3"
   },
   "devDependencies": {

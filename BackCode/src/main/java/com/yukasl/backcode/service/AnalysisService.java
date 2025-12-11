@@ -40,4 +40,9 @@ public interface AnalysisService {
      * 保存并上链告警
      */
     void saveAlert(potentialThreatAlert alert);
+
+    /**
+     * 获取攻击趋势统计数据
+     */
+    java.util.List<java.util.Map<String, Object>> getTrendStats(String timeRange);
 }

@@ -18,11 +18,11 @@ const ThreatAnalysis: React.FC = () => {
   const fetchData = async (range: string) => {
     setLoading(true);
     try {
-      // 获取真实数据 (Page 1, 100 records)
-      const data = await AnalysisService.getTraffic(1, 100);
+      // 使用新的聚合统计接口
+      const data = await AnalysisService.getTrend(range);
       
       // 数据处理与聚合
-      const processedData = processData(data);
+      const processedData = processData(data, range);
       setChartData(processedData);
     } catch (error) {
       console.error("Failed to fetch analysis data:", error);
@@ -31,49 +31,28 @@ const ThreatAnalysis: React.FC = () => {
     }
   };
 
-  const processData = (data: any[]) => {
+  const processData = (data: any[], range: string) => {
     if (!data || data.length === 0) return [];
 
-    // 按小时聚合攻击次数
-    const buckets: Record<string, { attacks: number }> = {};
-    
-    data.forEach(item => {
-      // Robust date parsing
-      let date: Date;
-      if (typeof item.statTime === 'string') {
-          // Replace space with T to ensure ISO format compatibility across browsers
-          // Handle 'yyyy-MM-dd HH:mm:ss' -> 'yyyy-MM-ddTHH:mm:ss'
-          date = new Date(item.statTime.replace(' ', 'T'));
-      } else if (Array.isArray(item.statTime)) {
-          // Handle [yyyy, MM, dd, HH, mm, ss]
-          const [year, month, day, hour, minute, second] = item.statTime;
-          date = new Date(year, month - 1, day, hour, minute, second);
-      } else if (item.statTime instanceof Date) {
-          date = item.statTime;
-      } else {
-          date = new Date(); // Fallback to now if invalid
-      }
+    return data.map(item => {
+        // 后端返回 { time_bucket: "2023-10-27 10:00:00", count: 5 }
+        const fullTime = item.time_bucket; 
+        let displayTime = fullTime;
 
-      if (isNaN(date.getTime())) {
-          return; // Skip invalid dates
-      }
+        if (range === '24h') {
+            // "2023-10-27 10:00:00" -> "10:00"
+            displayTime = fullTime.substring(11, 16);
+        } else {
+            // "2023-10-27" -> "10-27"
+            displayTime = fullTime.substring(5, 10);
+        }
 
-      const hour = date.getHours().toString().padStart(2, '0');
-      const minute = "00"; // Bucket by hour
-      const timeKey = `${hour}:${minute}`;
-      
-      if (!buckets[timeKey]) {
-        buckets[timeKey] = { attacks: 0 };
-      }
-      buckets[timeKey].attacks += (item.attackCount || 1);
+        return {
+            name: displayTime,
+            attacks: item.count,
+            traffic: 0 // 暂时无流量数据
+        };
     });
-
-    // 转换为数组并排序
-    return Object.keys(buckets).sort().map(key => ({
-      name: key,
-      attacks: buckets[key].attacks,
-      traffic: 0 // 暂时没有真实流量大小数据，置为0或移除
-    }));
   };
 
   const handleRefresh = () => {
@@ -83,12 +62,37 @@ const ThreatAnalysis: React.FC = () => {
   const handleExport = () => {
       setIsExporting(true);
       setExportSuccess(false);
-      // Simulate backend PDF generation
-      setTimeout(() => {
-          setIsExporting(false);
+      
+      try {
+          if (!chartData || chartData.length === 0) {
+              alert("当前没有数据可导出");
+              setIsExporting(false);
+              return;
+          }
+
+          // Convert chartData to CSV
+          const headers = ['Time', 'Attacks', 'Traffic(Bytes)'];
+          const csvContent = [
+              headers.join(','),
+              ...chartData.map(row => `${row.name},${row.attacks},${row.traffic}`)
+          ].join('\n');
+          
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `threat_analysis_${new Date().toISOString().slice(0,10)}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
           setExportSuccess(true);
-          setTimeout(() => setExportSuccess(false), 3000); // Hide success msg
-      }, 2000);
+          setTimeout(() => setExportSuccess(false), 3000);
+      } catch (e) {
+          console.error("Export failed", e);
+      } finally {
+          setIsExporting(false);
+      }
   };
 
   return (

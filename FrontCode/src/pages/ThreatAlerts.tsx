@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MOCK_THREATS } from '../utils/constants';
-<<<<<<< HEAD
 import { AlertTriangle, ShieldX, Eye, ChevronDown, ChevronUp, Wifi, WifiOff, Activity, Loader2, Unlock, List, Trash2, Plus, X } from 'lucide-react';
-=======
-import { AlertTriangle, ShieldX, Eye, ChevronDown, ChevronUp, Wifi, WifiOff, Activity, Loader2, Unlock } from 'lucide-react';
->>>>>>> f349a90129b9f0c3c78e0577cf408dd8154a9342
 import { ThreatEvent, RiskLevel } from '../types';
 import { IDSSocket, ThreatService } from '../services/connector';
 
