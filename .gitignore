@@ -116,3 +116,10 @@ FrontCode/pnpm-debug.log*
 # project_analysis.md (User asked to keep this, so do NOT ignore)
 temp/
 backup/
+
+# Install Package (Generated Artifact)
+Zhilian_Install_Package/
+
+# Dynamic Lists (Runtime generated)
+blocked_ips.json
+trusted_ips.json
