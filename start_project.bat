@@ -6,11 +6,11 @@ color 0B
 
 echo ==============================================================================
 echo.
-echo      ZZZZZZ  HH   HH  II  LL      II   AA    NN   NN   2222   0000   2222   55555
-echo         ZZ   HH   HH  II  LL      II  AAAA   NNN  NN  2    2 0    0 2    2  5    
-echo       ZZ     HHHHHHH  II  LL      II AA  AA  NN N NN      2  0    0     2   5555 
-echo      ZZ      HH   HH  II  LL      II AAAAAA  NN  NNN    2    0    0   2        5 
-echo      ZZZZZZ  HH   HH  II  LLLLLL  II AA  AA  NN   NN  22222   0000  22222  55555 
+echo     YY   YY  UU   UU  LL      II   AA    NN   NN   2222   0000   2222   55555
+echo      YY YY   UU   UU  LL      II  AAAA   NNN  NN  2    2 0    0 2    2  5
+echo       YYY    UU   UU  LL      II AA  AA  NN N NN      2  0    0     2   5555
+echo        Y     UU   UU  LL      II AAAAAA  NN  NNN    2    0    0   2        5 
+echo        Y      UUUUU   LLLLLL  II AA  AA  NN   NN  22222   0000  22222  55555
 echo.
 echo                          Cyber Security Platform 2025
 echo                             One-Click Deployment
@@ -36,7 +36,7 @@ if %errorlevel% neq 0 (
 where java >nul 2>nul
 if %errorlevel% neq 0 (
     echo [ERROR] Java ^(JDK^) is not found in PATH.
-    echo         Please install JDK 17+ and add it to PATH.
+
     pause
     exit /b 1
 ) else (
@@ -84,32 +84,28 @@ echo [1/5] Launching Blockchain Infrastructure (WSL)...
 echo       - FISCO BCOS Node (start_infra.sh)
 echo       - WeBASE Front (start_webase.sh if applicable)
 @REM 测试环境先不进行区块链网络启动，因为会导致重置
-@REM start "Blockchain Infra (WSL)" /D "%~dp0\backend\script" wsl bash -c "./start_infra.sh; ./start_webase.sh; read -p 'Press Enter to close...' "
-
-:: Wait for blockchain to initialize (approx 10s)
-echo       Waiting for blockchain to initialize (10s)...
-timeout /t 5 /nobreak >nul
 
 :: ==============================================================================
-:: 2. Start Blockchain Middleware (Java Spring Boot)
+:: 2. Start Blockchain Middleware (Java)
 :: ==============================================================================
 echo [2/5] Launching Blockchain Middleware...
-echo       - Connects to FISCO BCOS
-echo       - Provides REST API for Chain Data
-start "Blockchain Middleware" /min /D "%~dp0\backend" cmd /k "mvn spring-boot:run; echo 'Middleware stopped. Press Enter to exit...'; read"
+echo       - Port: 8080
+echo       - Service: Smart Contract Interface
+start "Backend Blockchain" /min /D "%~dp0\backend" cmd /k "mvn spring-boot:run && echo 'Middleware stopped. Press Enter to exit...' && pause"
 
 :: ==============================================================================
-:: 3. Start Business Backend (Java Spring Boot)
+:: 3. Start Backend Application (Java)
 :: ==============================================================================
-echo [3/5] Launching Business Backend (BackCode)...
-echo       - Core Business Logic
-echo       - Database Connection (MySQL/Redis)
-start "Business Backend" /min /D "%~dp0\BackCode" cmd /k "title Business Backend && mvn spring-boot:run"
+echo [3/5] Launching Backend Application...
+echo       - Port: 8081
+echo       - Service: Threat Analysis & API
+start "BackCode" /min /D "%~dp0\BackCode" cmd /k "mvn spring-boot:run && echo 'Backend stopped. Press Enter to exit...' && pause"
 
 :: ==============================================================================
-:: 4. Start Frontend (Vite + React)
+:: 4. Start Frontend Dashboard (Vue/React + Vite)
 :: ==============================================================================
 echo [4/5] Launching Frontend Dashboard...
+echo       - Port: 5173
 echo       - Installing dependencies (if needed)...
 echo       - Starting Dev Server...
 start "Frontend Dashboard" /D "%~dp0\FrontCode" cmd /k "title Frontend Dashboard && echo Installing dependencies... && npm install && echo Starting Vite Server... && npm run dev"
@@ -136,12 +132,12 @@ powershell -Command "Start-Process cmd -ArgumentList '/k chcp 65001 && title HID
 echo.
 echo ==============================================================================
 echo.
-echo [SUCCESS] All systems have been commanded to start.
+
 echo.
 echo Service Dashboard:
 echo  - Frontend:   http://localhost:5173 (or as shown in Frontend window)
-echo  - Backend:    http://localhost:8080
-echo  - Middleware: http://localhost:8081 (Verify port in application.yml)
+echo  - Backend:    http://localhost:8081
+echo  - Middleware: http://localhost:8080 (Verify port in application.yml)
 echo.
 echo Please check each terminal window for specific logs or errors.
 echo DO NOT CLOSE this window unless you want to stop the orchestration context.

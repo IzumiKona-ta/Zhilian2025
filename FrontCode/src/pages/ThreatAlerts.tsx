@@ -1,8 +1,132 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MOCK_THREATS } from '../utils/constants';
-import { AlertTriangle, ShieldX, Eye, ChevronDown, ChevronUp, Wifi, WifiOff, Activity, Loader2, Unlock, List, Trash2, Plus, X } from 'lucide-react';
+import { AlertTriangle, ShieldX, Eye, ChevronDown, ChevronUp, Wifi, WifiOff, Activity, Loader2, Unlock, List, Trash2, Plus, X, Brain, Send, Sparkles } from 'lucide-react';
 import { ThreatEvent, RiskLevel } from '../types';
 import { IDSSocket, ThreatService } from '../services/connector';
+
+// 威胁溯源分析弹窗组件
+interface TraceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  threat: ThreatEvent | null;
+  loading: boolean;
+  result: string | null;
+  formatThreatToLog: (threat: ThreatEvent) => string;
+}
+
+const TraceModal: React.FC<TraceModalProps> = ({ isOpen, onClose, threat, loading, result, formatThreatToLog }) => {
+  if (!isOpen || !threat) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* 背景遮罩 */}
+      <div 
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* 弹窗内容 */}
+      <div className="relative w-full max-w-4xl max-h-[85vh] mx-4 bg-cyber-900 border border-purple-500/30 rounded-2xl shadow-2xl shadow-purple-500/20 overflow-hidden flex flex-col">
+        {/* 头部 */}
+        <div className="px-6 py-4 border-b border-cyber-700 bg-gradient-to-r from-purple-500/10 to-blue-500/10 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-500/20 rounded-lg">
+              <Sparkles size={24} className="text-purple-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                Adv-SecGPT 安全威胁溯源分析
+              </h3>
+              <p className="text-sm text-slate-400">AI 驱动的智能威胁分析引擎</p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 hover:bg-cyber-700 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+        
+        {/* 内容区域 */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* 威胁信息摘要 */}
+          <div className="bg-cyber-800/50 border border-cyber-700 rounded-xl p-4">
+            <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">威胁信息</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-slate-500">攻击类型：</span>
+                <span className="text-red-400 font-bold ml-2">{threat.type}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">风险等级：</span>
+                <span className={`ml-2 font-bold ${
+                  threat.riskLevel === 'High' ? 'text-red-400' : 
+                  threat.riskLevel === 'Medium' ? 'text-orange-400' : 'text-blue-400'
+                }`}>{threat.riskLevel}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">源 IP：</span>
+                <span className="text-slate-300 font-mono ml-2">{threat.sourceIp}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">目标 IP：</span>
+                <span className="text-slate-300 font-mono ml-2">{threat.targetIp}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* 发送的日志格式 */}
+          <div className="bg-cyber-800/50 border border-cyber-700 rounded-xl p-4">
+            <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+              <Send size={14} /> 发送至智能体的日志格式
+            </h4>
+            <pre className="text-xs text-emerald-400 bg-black/30 p-3 rounded-lg overflow-x-auto font-mono">
+              {formatThreatToLog(threat)}
+            </pre>
+          </div>
+          
+          {/* 分析结果 */}
+          <div className="bg-gradient-to-br from-purple-500/5 to-blue-500/5 border border-purple-500/20 rounded-xl p-4">
+            <h4 className="text-xs font-bold text-purple-400 uppercase mb-3 flex items-center gap-2">
+              <Brain size={14} /> Adv-SecGPT 分析结果
+            </h4>
+            
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative">
+                    <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+                    <Brain size={24} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-purple-400" />
+                  </div>
+                  <p className="text-slate-400 text-sm">正在分析威胁数据...</p>
+                </div>
+              </div>
+            ) : result ? (
+              <div className="prose prose-invert max-w-none">
+                <pre className="text-sm text-slate-300 bg-black/20 p-4 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed">
+                  {result}
+                </pre>
+              </div>
+            ) : (
+              <p className="text-slate-500 text-center py-8">等待分析结果...</p>
+            )}
+          </div>
+        </div>
+        
+        {/* 底部 */}
+        <div className="px-6 py-4 border-t border-cyber-700 bg-cyber-800/50 flex justify-end gap-3 shrink-0">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-cyber-700 text-slate-300 border border-cyber-600 rounded-lg hover:bg-cyber-600 transition-colors font-bold"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ThreatAlerts: React.FC = () => {
   const [threats, setThreats] = useState<ThreatEvent[]>([]);
@@ -14,6 +138,12 @@ const ThreatAlerts: React.FC = () => {
   const [processingAction, setProcessingAction] = useState<{id: string, type: 'block' | 'resolve' | 'unblock'} | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<IDSSocket | null>(null);
+
+  // 安全威胁溯源状态
+  const [traceModalOpen, setTraceModalOpen] = useState(false);
+  const [traceLoading, setTraceLoading] = useState(false);
+  const [traceResult, setTraceResult] = useState<string | null>(null);
+  const [currentThreat, setCurrentThreat] = useState<ThreatEvent | null>(null);
 
   // --- Firewall Blacklist State ---
   const [showBlacklist, setShowBlacklist] = useState(false);
@@ -193,6 +323,109 @@ const ThreatAlerts: React.FC = () => {
     
     setThreats(prev => prev.map(t => t.id === id ? { ...t, status: 'Resolved' } : t));
     setProcessingAction(null);
+  };
+
+  // 将威胁数据转换为日志格式
+  const formatThreatToLog = (threat: ThreatEvent): string => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).replace(/ /g, '/');
+    const timeStr = now.toLocaleTimeString('en-GB', { hour12: false });
+    const timezone = '+0800';
+    
+    // 根据攻击类型生成对应的请求路径（不使用 encodeURIComponent，保持可读性）
+    let requestPath = '/index.html';
+    let userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
+    
+    switch (threat.type.toLowerCase()) {
+      case 'ddos':
+        requestPath = '/api/stress?flood=AAAAAAA...';
+        userAgent = 'DDoS-Bot/1.0';
+        break;
+      case 'bot':
+        requestPath = "/admin/login.php?user=admin&pass=' OR '1'='1";
+        userAgent = 'BotNet-Scanner/2.0';
+        break;
+      case 'sql injection':
+      case 'sqli':
+        requestPath = '/product.php?id=1 AND (SELECT 55 FROM (SELECT(SLEEP(5)))a)';
+        userAgent = 'Mozilla/5.0 (SQLTester)';
+        break;
+      case 'dos_hulk':
+      case 'hulk':
+        requestPath = '/search?q=HULK_ATTACK_PAYLOAD';
+        userAgent = 'HULK-DoS/1.0';
+        break;
+      case 'portscan':
+      case 'port scan':
+        requestPath = `/scan?ports=1-65535&target=${threat.targetIp}`;
+        userAgent = 'Nmap-Scanner/7.0';
+        break;
+      case 'web attack':
+        requestPath = '/api/exec?cmd=echo d2hvYW1p | base64 -d | sh';
+        userAgent = 'Python/3.8';
+        break;
+      default:
+        requestPath = `/attack?type=${threat.type}`;
+        userAgent = `AttackTool/${threat.type}`;
+    }
+    
+    return `${threat.sourceIp} - - [${dateStr}:${timeStr} ${timezone}] "GET ${requestPath} HTTP/1.1" 200 450 "-" "${userAgent}"`;
+  };
+
+  // 调用 Adv-SecGPT 智能体进行威胁溯源分析
+  const handleThreatTrace = async (threat: ThreatEvent, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentThreat(threat);
+    setTraceModalOpen(true);
+    setTraceLoading(true);
+    setTraceResult(null);
+    
+    try {
+      const logFormat = formatThreatToLog(threat);
+      console.log('发送日志格式:', logFormat);
+      
+      // 通过后端代理调用智能体，避免跨域问题
+      const response = await fetch('http://localhost:8081/api/analysis/ai-trace', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: `分析日志：${logFormat}`,
+          top_k: 3
+        })
+      });
+      
+      console.log('响应状态:', response.status, response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('响应错误:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('后端返回结果:', result);
+      
+      // 后端返回格式是 { code, msg, data }，智能体响应在 data 中
+      if (result.code === 1 && result.data) {
+        const answer = result.data.answer || result.data.response || JSON.stringify(result.data, null, 2);
+        console.log('设置分析结果:', answer);
+        setTraceResult(answer);
+      } else {
+        console.error('分析失败，code:', result.code, 'msg:', result.msg);
+        setTraceResult(result.msg || '分析失败，请查看控制台');
+      }
+    } catch (error) {
+      console.error('威胁溯源分析失败:', error);
+      setTraceResult(`分析请求失败: ${error instanceof Error ? error.message : '未知错误'}\n\n请确保:\n1. 后端服务正在运行 (http://127.0.0.1:8081)\n2. Adv-SecGPT 智能体服务正在运行 (http://10.138.50.151:8000)`);
+    } finally {
+      setTraceLoading(false);
+    }
   };
 
   const getRiskLabel = (level: RiskLevel) => {
@@ -403,8 +636,11 @@ const ThreatAlerts: React.FC = () => {
                       </button>
                     )}
 
-                    <button className="px-4 py-2 bg-cyber-800 text-slate-300 border border-cyber-700 rounded hover:bg-cyber-700 flex items-center gap-2 text-sm">
-                      <Eye size={16} /> 关联溯源
+                    <button 
+                      onClick={(e) => handleThreatTrace(threat, e)}
+                      className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-300 border border-purple-500/50 rounded hover:from-purple-500/30 hover:to-blue-500/30 flex items-center gap-2 text-sm font-bold transition-all"
+                    >
+                      <Brain size={16} /> 安全威胁溯源
                     </button>
                   </div>
                </div>
@@ -412,6 +648,16 @@ const ThreatAlerts: React.FC = () => {
            </div>
          ))}
        </div>
+
+       {/* 威胁溯源分析弹窗 */}
+       <TraceModal 
+         isOpen={traceModalOpen}
+         onClose={() => setTraceModalOpen(false)}
+         threat={currentThreat}
+         loading={traceLoading}
+         result={traceResult}
+         formatThreatToLog={formatThreatToLog}
+       />
 
        {/* Blacklist Management Modal */}
        {showBlacklist && (

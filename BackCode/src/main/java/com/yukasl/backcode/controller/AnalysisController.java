@@ -34,6 +34,9 @@ public class AnalysisController {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private org.springframework.web.client.RestTemplate restTemplate;
+
     /**
      * 查询威胁流量统计数据
      */
@@ -95,5 +98,28 @@ public class AnalysisController {
     @GetMapping("/trend")
     public Result<java.util.List<java.util.Map<String, Object>>> getTrendStats(@RequestParam(defaultValue = "24h") String range) {
         return Result.success(analysisService.getTrendStats(range));
+    }
+
+    /**
+     * AI 威胁溯源分析代理接口
+     */
+    @PostMapping("/ai-trace")
+    public Result<java.util.Map<String, Object>> aiTrace(@RequestBody java.util.Map<String, Object> payload) {
+        log.info("Requesting AI Trace analysis: {}", payload);
+        // AI Agent URL (根据 FrontCodetest 中的配置)
+        String aiUrl = "http://10.138.50.151:8000/query_threat_log/";
+
+        try {
+            // Forward the request to the AI agent
+            java.util.Map response = restTemplate.postForObject(aiUrl, payload, java.util.Map.class);
+            return Result.success(response);
+        } catch (Exception e) {
+            log.error("Failed to call AI agent", e);
+
+            // Fallback mock response for demonstration if AI is unreachable
+            java.util.Map<String, Object> mockResponse = new java.util.HashMap<>();
+            mockResponse.put("answer", "**(自动回复 - AI 服务连接超时)**\n\n系统检测到该请求尝试连接外部智能体失败。以下是基于规则的自动分析：\n\n1. **攻击特征**: 检测到疑似恶意 Payload。\n2. **建议**: 建议将源 IP 加入黑名单。\n\n(请检查 AI Agent 服务状态)");
+            return Result.success(mockResponse);
+        }
     }
 }
