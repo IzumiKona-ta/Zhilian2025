@@ -8,7 +8,7 @@
 
 使用说明：
     - 默认攻击 30 秒，可通过 --duration 参数调节
-    - TARGET_IP 默认 192.168.109.151，可通过命令行参数覆盖
+
     - 需要在攻击机（如虚拟机）上运行，目标为物理机 IP
 """
 import argparse
@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 
 
-DEFAULT_TARGET = "192.168.31.87"
+DEFAULT_TARGET = "192.168.31.5"
 DEFAULT_DURATION = 35
 
 # 未知攻击使用的端口范围（与检测端的已知端口库错开）

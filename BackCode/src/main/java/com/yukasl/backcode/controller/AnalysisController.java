@@ -106,8 +106,8 @@ public class AnalysisController {
     @PostMapping("/ai-trace")
     public Result<java.util.Map<String, Object>> aiTrace(@RequestBody java.util.Map<String, Object> payload) {
         log.info("Requesting AI Trace analysis: {}", payload);
-        // AI Agent URL (根据 FrontCodetest 中的配置)
-        String aiUrl = "http://10.138.50.151:8000/query_threat_log/";
+        // AI Agent URL (使用与智能报告相同的接口)
+        String aiUrl = "http://10.138.50.151:8000/api/chat";
 
         try {
             // Forward the request to the AI agent

@@ -3,6 +3,8 @@ import { MOCK_THREATS } from '../utils/constants';
 import { AlertTriangle, ShieldX, Eye, ChevronDown, ChevronUp, Wifi, WifiOff, Activity, Loader2, Unlock, List, Trash2, Plus, X, Brain, Send, Sparkles } from 'lucide-react';
 import { ThreatEvent, RiskLevel } from '../types';
 import { IDSSocket, ThreatService } from '../services/connector';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // 威胁溯源分析弹窗组件
 interface TraceModalProps {
@@ -103,10 +105,10 @@ const TraceModal: React.FC<TraceModalProps> = ({ isOpen, onClose, threat, loadin
                 </div>
               </div>
             ) : result ? (
-              <div className="prose prose-invert max-w-none">
-                <pre className="text-sm text-slate-300 bg-black/20 p-4 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed">
+              <div className="prose prose-invert max-w-none bg-black/20 p-4 rounded-lg overflow-y-auto max-h-[400px] text-sm text-slate-300">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {result}
-                </pre>
+                </ReactMarkdown>
               </div>
             ) : (
               <p className="text-slate-500 text-center py-8">等待分析结果...</p>
@@ -389,26 +391,11 @@ const ThreatAlerts: React.FC = () => {
       console.log('发送日志格式:', logFormat);
       
       // 通过后端代理调用智能体，避免跨域问题
-      const response = await fetch('http://localhost:8081/api/analysis/ai-trace', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          question: `分析日志：${logFormat}`,
-          top_k: 3
-        })
+      const result = await ThreatService.traceThreat({
+        question: `分析日志：${logFormat}`,
+        top_k: 3
       });
       
-      console.log('响应状态:', response.status, response.ok);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('响应错误:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
       console.log('后端返回结果:', result);
       
       // 后端返回格式是 { code, msg, data }，智能体响应在 data 中

@@ -80,10 +80,18 @@ echo.
 :: ==============================================================================
 :: 1. Start Blockchain Infrastructure (WSL)
 :: ==============================================================================
-echo [1/5] Launching Blockchain Infrastructure (WSL)...
-echo       - FISCO BCOS Node (start_infra.sh)
-echo       - WeBASE Front (start_webase.sh if applicable)
-@REM 测试环境先不进行区块链网络启动，因为会导致重置
+echo [1/5] Blockchain Infrastructure Setup
+echo.
+echo [WARNING] Deploying the blockchain network will RESET the ledger data!
+echo.
+set /p DEPLOY_CHAIN="Do you want to (re)deploy the Hyperledger Fabric Network? (Y/N): "
+if /i "%DEPLOY_CHAIN%"=="Y" (
+    echo [INFO] Starting Hyperledger Fabric Network via WSL...
+    echo        Please ensure Docker Desktop is running.
+    wsl -e bash ./Zhilian_Install_Package/scripts/start_infra.sh
+) else (
+    echo [INFO] Skipping blockchain network deployment.
+)
 
 :: ==============================================================================
 :: 2. Start Blockchain Middleware (Java)

@@ -23,6 +23,7 @@ const ENDPOINTS = {
   THREAT_MANUAL_BLOCK: '/threats/manual-block',           // 手动封禁 IP (POST)
   THREAT_MANUAL_UNBLOCK: '/threats/manual-unblock',       // 手动解封 IP (POST)
   THREAT_HISTORY: '/analysis/alert',                        // 获取历史威胁记录 (GET)
+  AI_TRACE: '/analysis/ai-trace',                           // AI 威胁溯源分析 (POST)
 
   // --- 数据采集配置 ---
   CONFIG_UPDATE: '/collection/config',  // Deprecated?
@@ -383,6 +384,12 @@ export const ThreatService = {
         console.error("Failed to fetch history:", error);
         return [];
     }
+  },
+
+  // AI 威胁溯源分析
+  traceThreat: async (payload: { question: string, top_k: number }): Promise<any> => {
+    const response = await api.post(ENDPOINTS.AI_TRACE, payload);
+    return response.data; // 返回 { code, msg, data }
   }
 };
 

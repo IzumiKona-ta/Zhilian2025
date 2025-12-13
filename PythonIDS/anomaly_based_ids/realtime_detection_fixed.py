@@ -96,10 +96,10 @@ def reload_trusted_ips():
         pass
 
 # 判定灵敏度（可通过环境变量调整）
-# 【关键修复】提高阈值以减少误报：0.5太低，容易误报，0.6更合理
-MIN_ATTACK_CONFIDENCE = float(os.environ.get("MIN_ATTACK_CONFIDENCE", "0.6"))
-# 【关键修复】降低OOD检测敏感度：-0.05太敏感，导致大量误报，-0.15更合理
-REAL_SCORE_THRESHOLD = float(os.environ.get("REAL_SCORE_THRESHOLD", "-0.15"))
+# 【调整】恢复阈值以解决unknown流量过多问题（参考backup版本）
+MIN_ATTACK_CONFIDENCE = float(os.environ.get("MIN_ATTACK_CONFIDENCE", "0.5"))
+# 【调整】恢复OOD检测敏感度（参考backup版本）
+REAL_SCORE_THRESHOLD = float(os.environ.get("REAL_SCORE_THRESHOLD", "-0.05"))
 
 # 端口特征：哪些组合被视为“已知”攻击（其余高危流量可落入未知）
 KNOWN_ATTACK_SOURCE_PORTS = {
@@ -406,7 +406,7 @@ def calculate_severity(attack_type, confidence, is_known_attack, real_score, flo
         # 未知攻击默认都是高危
         if real_score <= -0.2:  # 降低阈值，只有非常不真实的才视为最高危
             return 5  # 最高危（真实度得分很低）
-        return 3  # 中危（普通未知攻击降级为中危，避免大量高危告警刷屏）
+        return 2  # 低危（普通未知攻击降级为低危，避免大量高危告警刷屏）
     
     # 1. 高危攻击类型 + 高置信度 = 最高危 (severity 5)
     if any(risk in attack_type_str for risk in high_risk_attacks):
@@ -511,6 +511,16 @@ def packet_callback(packet):
         if src_ip in blocked_ips:
             # 已封禁IP的流量，跳过检测（避免重复告警）
             return
+
+    # === 新增：特定端口白名单（放行腾讯会议等高频流量） ===
+    if packet.haslayer(TCP) or packet.haslayer(UDP):
+        sport = packet[TCP].sport if packet.haslayer(TCP) else packet[UDP].sport
+        dport = packet[TCP].dport if packet.haslayer(TCP) else packet[UDP].dport
+        # 腾讯会议/微信视频常用端口 (3478, 8080, 443等)
+        if sport in {3478, 8080, 443} or dport in {3478, 8080, 443}:
+            # 暂时跳过检测，视为信任流量
+            return
+    # ===========================================
 
     # 1. 显示基础包信息
     if SHOW_ALL_PACKETS:
@@ -697,7 +707,7 @@ def packet_callback(packet):
                 if is_known_attack_type:
                     # 如果模型分类为已知攻击类型，保留原始分类
                     is_known_attack = True
-                elif packets_per_s > 2000 or bytes_per_s > 5000000:  # 每秒2000包或5MB（大幅提高阈值，避免正常高带宽流量误报）
+                elif packets_per_s > 5000 or bytes_per_s > 10000000:  # 每秒5000包或10MB（再次大幅提高阈值，避免正常高带宽流量误报）
                     # 【关键修复】对于本地→外部的流量,即使特征异常,也要检查是否为正常流量
                     if is_local_to_external and attack_type == normal_label:
                         # 本地→外部的正常流量,即使包速率高也可能是正常下载/上传
@@ -800,7 +810,7 @@ def packet_callback(packet):
             # 检查是否为明显的攻击特征
             is_one_way = (flow_stats.fwd_packets > 0 and flow_stats.bwd_packets == 0) or \
                          (flow_stats.fwd_packets == 0 and flow_stats.bwd_packets > 0)
-            is_high_rate = packets_per_s > 150 or bytes_per_s > 150000  # 每秒150包或150KB（提高阈值，减少误报）
+            is_high_rate = packets_per_s > 500 or bytes_per_s > 500000  # 每秒500包或500KB（提高阈值，减少误报）
             is_high_volume = total_packets > 500  # 总包数超过500（提高阈值，减少误报）
             is_very_high_rate = packets_per_s > 300 or bytes_per_s > 300000  # 每秒300包或300KB（提高阈值，减少误报）
             
@@ -813,6 +823,10 @@ def packet_callback(packet):
             # 获取端口信息用于更精确的判断
             src_port = flow_stats.src_port
             dst_port = flow_stats.dst_port
+            
+            # 定义常见服务端口（需要严格过滤以防误报）
+            common_service_ports = {80, 443, 53, 22, 21, 25, 110, 143, 993, 995, 8080, 8443, 3389, 445, 3478}
+            is_common_port = (dst_port in common_service_ports) or (src_port in common_service_ports)
             
             # 【第一步】根据源端口识别攻击类型（攻击脚本使用了固定源端口）
             # UDP Flood: 源端口50000, 目标端口80
@@ -1105,6 +1119,9 @@ def packet_callback(packet):
                 # 【关键修复】对于本地->外部的流量，不应该判定为未知攻击
                 if is_local_to_external:
                     # 本地->外部：保持正常流量分类
+                    pass
+                # 【关键修复】如果real_score > 0.0，且是常见端口，说明模型认为流量结构很正常
+                elif real_score > 0.0 and is_common_port:
                     pass
                 else:
                     # 如果无法推断具体类型，但特征明显异常，且模型分类为正常，使用"Unknown Attack (UA)"

@@ -40,16 +40,16 @@ CREATE TABLE `host_status_monitor`  (
 -- ----------------------------
 -- Records of host_status_monitor
 -- ----------------------------
-INSERT INTO `host_status_monitor` VALUES (1, 'host_001', 23.5, 45.2, 128, '2025-11-27 00:15:30', '2025-11-27 22:42:05');
-INSERT INTO `host_status_monitor` VALUES (2, 'host_002', 48.9, 67.8, 89, '2025-11-27 01:20:15', '2025-11-27 22:42:05');
-INSERT INTO `host_status_monitor` VALUES (3, 'host_003', 12.3, 32.1, 56, '2025-11-27 02:05:40', '2025-11-27 22:42:05');
-INSERT INTO `host_status_monitor` VALUES (4, 'host_004', 78.6, 89.3, 210, '2025-11-27 03:30:22', '2025-11-27 22:42:05');
-INSERT INTO `host_status_monitor` VALUES (5, 'host_005', 35.7, 52.9, 98, '2025-11-27 04:18:55', '2025-11-27 22:42:05');
-INSERT INTO `host_status_monitor` VALUES (6, 'host_006', 5.2, 18.7, 34, '2025-11-27 05:42:10', '2025-11-27 22:42:05');
-INSERT INTO `host_status_monitor` VALUES (7, 'host_007', 67.4, 73.5, 156, '2025-11-27 06:25:33', '2025-11-27 22:42:05');
-INSERT INTO `host_status_monitor` VALUES (8, 'host_008', 29.8, 41.2, 76, '2025-11-27 07:10:45', '2025-11-27 22:42:05');
-INSERT INTO `host_status_monitor` VALUES (9, 'host_009', 83.1, 91.4, 245, '2025-11-27 08:35:18', '2025-11-27 22:42:05');
-INSERT INTO `host_status_monitor` VALUES (10, 'host_010', 18.9, 27.6, 63, '2025-11-27 09:50:27', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (1, 'host_001', 23.5, 45.2, 128, 45.0, '/: 45%', '{}', '2025-11-27 00:15:30', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (2, 'host_002', 48.9, 67.8, 89, 60.5, '/: 60%', '{}', '2025-11-27 01:20:15', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (3, 'host_003', 12.3, 32.1, 56, 30.0, '/: 30%', '{}', '2025-11-27 02:05:40', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (4, 'host_004', 78.6, 89.3, 210, 85.0, '/: 85%', '{}', '2025-11-27 03:30:22', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (5, 'host_005', 35.7, 52.9, 98, 50.0, '/: 50%', '{}', '2025-11-27 04:18:55', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (6, 'host_006', 5.2, 18.7, 34, 15.0, '/: 15%', '{}', '2025-11-27 05:42:10', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (7, 'host_007', 67.4, 73.5, 156, 70.0, '/: 70%', '{}', '2025-11-27 06:25:33', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (8, 'host_008', 29.8, 41.2, 76, 40.0, '/: 40%', '{}', '2025-11-27 07:10:45', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (9, 'host_009', 83.1, 91.4, 245, 90.0, '/: 90%', '{}', '2025-11-27 08:35:18', '2025-11-27 22:42:05');
+INSERT INTO `host_status_monitor` VALUES (10, 'host_010', 18.9, 27.6, 63, 25.0, '/: 25%', '{}', '2025-11-27 09:50:27', '2025-11-27 22:42:05');
 
 -- ----------------------------
 -- Table structure for network_threat_collection_api
